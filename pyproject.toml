@@ -1,0 +1,15 @@
+[project]
+name = "nerfuser"
+version = "0.1.0"
+
+dependencies=[
+    "nerfstudio>=0.2.0",
+    "hloc",
+    "imageio-ffmpeg"
+]
+
+[tool.setuptools.packages.find]
+include = ["nerfuser*"]
+
+[project.scripts]
+ns-fuse = "nerfuser.fuser:entrypoint"
