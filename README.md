@@ -1,16 +1,47 @@
-# nerfuser-release
+# NeRFuser
+
 Official Code Release for NeRFuser
 
-# Install
-1. Install [nerfstudio](https://github.com/nerfstudio-project/nerfstudio)
-2. Install [hloc](https://github.com/cvg/Hierarchical-Localization)
-3. Navigate to this repo and install by
-```code
-pip install -e .
+## Installation
+
+### 0. Create a conda environment and activate it
+
+```bash
+conda create -n nerfuser -y python=3.9 && conda activate nerfuser
 ```
 
-# Run
-Use command `ns-fuse`. Example usage:
+### 1. Install dependencies
+
+* [nerfstudio](https://github.com/nerfstudio-project/nerfstudio)
+
+    ```bash
+    pip install torch==1.13.1 torchvision functorch
+    pip install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+    pip install nerfstudio
+    ```
+
+* [hloc](https://github.com/cvg/Hierarchical-Localization)
+
+    ```bash
+    git clone --recursive git@github.com:cvg/Hierarchical-Localization.git && pip install -e Hierarchical-Localization
+    ```
+
+* [imageio-ffmpeg](https://pypi.org/project/imageio-ffmpeg/)
+
+    ```bash
+    pip install imageio-ffmpeg
+    ```
+
+### 3. Install NeRFuser
+
+```bash
+pip install git+https://github.com/ripl/nerfuser
 ```
-ns-fuse --name ttic_common_large-reg-and-blend --dataset-dir data/ttic/common_large/ --model-method nerfacto --model-names A B C --model-gt-trans I --model-dirs models/common_large/A/nerfacto/2023-04-16_185306/nerfstudio_models/ models/common_large/B/nerfacto/2023-04-16_185245/nerfstudio_models/ models/common_large/C/nerfacto/2023-04-16_185251/nerfstudio_models/ --cam-info data/ttic/common_large/test/transforms.json --render-views --run-sfm  --compute-trans  --test-poses data/ttic/common_large/test/transforms.json  --blend-output-dir outputs/blending/sfm_blend  --gammas 5 --tau 2  --test-frame world  --blend_views --evaluate_blend
+
+## Run
+
+Use command `ns-fuse`. Usage example:
+
+```bash
+ns-fuse --name ttic/common_large --dataset-dir data/ttic/common_large/ --model-method nerfacto --model-names A B C --model-gt-trans I --model-dirs models/common_large/A/nerfacto/2023-04-16_185306/nerfstudio_models/ models/common_large/B/nerfacto/2023-04-16_185245/nerfstudio_models/ models/common_large/C/nerfacto/2023-04-16_185251/nerfstudio_models/ --cam-info data/ttic/common_large/test/transforms.json --render-views --run-sfm --compute-trans --test-poses data/ttic/common_large/test/transforms.json --blend-output-dir outputs/blending/sfm_blend --gammas 5 --tau 2 --test-frame world --blend_views --evaluate_blend
 ```
