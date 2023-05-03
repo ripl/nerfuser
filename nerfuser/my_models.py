@@ -129,9 +129,9 @@ class MyRGBRenderer(RGBRenderer):
         """
         comp_rgb = torch.sum(rgb * ws, dim=-2)
 
-        if background_color == "last_sample":
+        if background_color == 'last_sample':
             background_color = rgb[..., -1, :]
-        elif background_color == "random":
+        elif background_color == 'random':
             background_color = torch.rand_like(comp_rgb)
 
         comp_rgb += background_color * bg_w

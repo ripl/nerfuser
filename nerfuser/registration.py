@@ -1,125 +1,116 @@
-import argparse
 import json
 import os
 import re
 import shutil
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import cycle
 from pathlib import Path
+from typing import List, Literal, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
-from nerfstudio.process_data.colmap_utils import (
-    CameraModel,
-    read_images_binary,
-    run_colmap,
-)
+import tyro
+from nerfstudio.process_data.colmap_utils import (CameraModel,
+                                                  read_images_binary,
+                                                  run_colmap)
 from nerfstudio.process_data.hloc_utils import run_hloc
-from nerfuser.utils.utils import (
-    avg_trans,
-    complete_transform,
-    compute_trans_diff,
-    decompose_sim3,
-    extract_colmap_pose,
-    gen_hemispherical_poses,
-)
+
+from nerfuser.utils.utils import (avg_trans, complete_transform,
+                                  compute_trans_diff, decompose_sim3,
+                                  extract_colmap_pose, gen_hemispherical_poses)
+from nerfuser.utils.visualizer import Visualizer
 from nerfuser.view_renderer import ViewRenderer
 
-# from nerfstudio.utils.fuser_utils.visualizer import Visualizer
 
-
+@dataclass
 class Registration:
-    def __init__(
-        self,
-        name,
-        model_method,
-        model_names,
-        model_gt_trans,
-        model_dirs,
-        step,
-        cam_info,
-        downscale_factor,
-        chunk_size,
-        training_poses,
-        n_hemi_poses,
-        render_hemi_views,
-        fps,
-        sfm_tool,
-        sfm_wo_training_views,
-        sfm_w_hemi_views,
-        output_dir,
-        render_views,
-        run_sfm,
-        compute_trans,
-        vis,
-    ) -> None:
-        self.name = name
-        self.model_method = model_method
-        self.model_names = model_names
-        self.model_gt_trans = model_gt_trans
-        self.model_dirs = model_dirs
-        self.step = step
-        self.cam_info = cam_info
-        self.downscale_factor = downscale_factor
-        self.chunk_size = chunk_size
-        self.training_poses = training_poses
-        self.n_hemi_poses = n_hemi_poses
-        self.render_hemi_views = render_hemi_views
-        self.fps = fps
-        self.sfm_tool = sfm_tool
-        self.sfm_wo_training_views = sfm_wo_training_views
-        self.sfm_w_hemi_views = sfm_w_hemi_views
-        self.output_dir = output_dir
-        self.render_views = render_views
-        self.run_sfm = run_sfm
-        self.compute_trans = compute_trans
-        self.vis = vis
+    """Register multiple NeRF models to a common coordinate system."""
 
-    def run(self):
-        if self.name:
-            name = self.name
-        else:
-            name = datetime.now().strftime('%m.%d_%H:%M:%S')
-        output_dir = Path(self.output_dir) / name
+    model_dirs: List[Path]
+    """model checkpoint directories"""
+    output_dir: Path = Path('outputs/registration')
+    """output directory"""
+    name: Optional[str] = None
+    """if present, will continue with the existing named experiment"""
+    model_method: Literal['nerfacto'] = 'nerfacto'
+    """model method"""
+    model_names: Optional[List[str]] = None
+    """names of models to register"""
+    model_gt_trans: Optional[str] = None
+    """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity" """
+    step: Optional[int] = None
+    """model step to load"""
+    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400, 400, 400, 300, 800, 600])
+    """either path to json or cam params (fx fy cx cy w h)"""
+    downscale_factor: Optional[float] = None
+    """downsample factor for NeRF rendering"""
+    training_poses: Optional[List[str]] = None
+    """paths to training poses defined in models' local coordinate systems; if present, will be used to render training views and to determine the number of hemispheric poses"""
+    n_hemi_poses: int = 32
+    """number of hemispheric poses; only applicable when training-poses is not present"""
+    render_hemi_views: bool = False
+    """use 1.3x hemispheric poses for rendering"""
+    chunk_size: Optional[int] = None
+    """number of rays to process at a time"""
+    fps: Optional[int] = None
+    """if present, will use this frame rate for video output"""
+    sfm_tool: Literal['hloc', 'colmap'] = 'hloc'
+    """SfM tool to use"""
+    sfm_w_training_views: bool = True
+    """when render-hemi-views, set this to False to only use hemispheric views for SfM"""
+    sfm_w_hemi_views: float = 1
+    """ratio of #hemi-views vs. #training-views or n-hemi-poses for SfM, within range [0, 1.3]"""
+    device: str = 'cuda:0'
+    """device to use"""
+    render_views: bool = False
+    """whether to render views"""
+    run_sfm: bool = False
+    """whether to run SfM"""
+    compute_trans: bool = False
+    """whether to compute transforms"""
+    vis: bool = False
+    """whether to visualize the registration"""
+
+    def main(self):
+        if not self.name:
+            self.name = datetime.now().strftime('%m.%d_%H:%M:%S')
+        output_dir = self.output_dir / self.name
         os.makedirs(output_dir, exist_ok=True)
-        model_dirs = [Path(model_dir) for model_dir in self.model_dirs]
-        n_models = len(model_dirs)
-        model_names = self.model_names if self.model_names else [f'nerf{i}' for i in range(n_models)]
+        n_models = len(self.model_dirs)
+        if not self.model_names:
+            self.model_names = [f'nerf{i}' for i in range(n_models)]
         if self.render_hemi_views:
             cfg = f'hemi{self.sfm_w_hemi_views:.2f}'
             if self.training_poses:
-                cfg += f'_train{int(not (self.render_hemi_views and self.sfm_wo_training_views))}'
+                cfg += f'_train{int(self.sfm_w_training_views)}'
         else:
             cfg = 'train' if self.training_poses else 'hemi'
         sfm_dir = output_dir / f'sfm_{cfg}'
-        log_dict = {k: getattr(self, k) for k in ['model_method', 'model_gt_trans', 'step', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'sfm_tool']}
-        log_dict['cam_info'] = [(str(cam_info) if isinstance(cam_info, Path) else cam_info) for cam_info in self.cam_info]
-        log_dict['model_dirs'] = {model_name: str(model_dir) for model_name, model_dir in zip(model_names, model_dirs)}
-        print('log_dict', log_dict)
+        log_dict = {attr: dict(zip(self.model_names, [str(model_dir) for model_dir in self.model_dirs])) if attr == 'model_dirs' else getattr(self, attr) for attr in ['model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'sfm_tool']}
         with open(output_dir / f'{cfg}.json', 'w') as f:
             json.dump(log_dict, f, indent=2)
 
         # nerf-to-normalized transforms
         Ts_nerf_norm = []
-        Ss_nerf_norm = []
-        for model_dir in model_dirs:
+        Ss_norm_nerf = []
+        for model_dir in self.model_dirs:
             with open(model_dir.parent / 'dataparser_transforms.json') as f:
                 transforms = json.load(f)
             s = transforms['scale']
-            Ss_nerf_norm.append(np.diag((s, s, s, 1)).astype(np.float32))
-            Ts_nerf_norm.append(Ss_nerf_norm[-1] @ complete_transform(np.array(transforms['transform'], dtype=np.float32)))
+            S_nerf_norm = np.diag((s, s, s, 1)).astype(np.float32)
+            Ss_norm_nerf.append(np.linalg.inv(S_nerf_norm))
+            Ts_nerf_norm.append(S_nerf_norm @ complete_transform(np.array(transforms['transform'], dtype=np.float32)))
         Ts_nerf_norm = np.stack(Ts_nerf_norm)
-        Ss_nerf_norm = np.stack(Ss_nerf_norm)
-        S_invs_nerf_norm = np.linalg.inv(Ss_nerf_norm)
+        Ss_norm_nerf = np.stack(Ss_norm_nerf)
         if self.model_gt_trans:
             # gt world-to-nerf transforms
             Ts_gt_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32)[None], (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
             # gt world-to-normalized transforms
             Ts_gt_world_norm = Ts_nerf_norm @ Ts_gt_world_nerf
-            T_invs_gt_world_norm = np.linalg.inv(Ts_gt_world_norm)
+            Ts_gt_norm_world = np.linalg.inv(Ts_gt_world_norm)
             _, s = decompose_sim3(Ts_gt_world_norm)
             Ss_gt_world_norm = np.zeros((n_models, 4, 4))
             for i in range(3):
@@ -144,27 +135,26 @@ class Registration:
         rng = np.random.default_rng(0)
 
         if self.render_views:
-            # if isinstance(self.cam_info, Path):
-            if len(self.cam_info) == 1:
-                with open(self.cam_info[0]) as f:
+            if isinstance(self.cam_info, str):
+                with open(self.cam_info) as f:
                     transforms = json.load(f)
                 cam_info = {'fx': transforms['fl_x'], 'fy': transforms['fl_y'], 'cx': transforms['cx'], 'cy': transforms['cy'], 'width': transforms['w'], 'height': transforms['h'], 'distortion_params': np.array([transforms['k1'], transforms['k2'], 0, 0, transforms['p1'], transforms['p2']], dtype=np.float32)}
             else:
-                cam_info = dict(zip(['fx', 'fy', 'cx', 'cy', 'width', 'height'], [float(v) for v in self.cam_info]))
+                cam_info = dict(zip(['fx', 'fy', 'cx', 'cy', 'width', 'height'], self.cam_info))
             if self.downscale_factor:
                 for pname in cam_info:
                     if pname != 'distortion_params':
                         cam_info[pname] /= self.downscale_factor
             cam_info['height'] = int(cam_info['height'])
             cam_info['width'] = int(cam_info['width'])
-            for i, model_dir in enumerate(model_dirs):
+            for i, model_dir in enumerate(self.model_dirs):
                 poses_norm = complete_transform(np.array(gen_hemispherical_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
                 if self.training_poses:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
-                    poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.stack([pose_dict[k] for k in sorted(pose_dict.keys())]) @ S_invs_nerf_norm[i]))
+                    poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.stack([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
                 with torch.no_grad():
-                    ViewRenderer(self.model_method, model_names[i], model_dir, load_step=self.step, chunk_size=self.chunk_size).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
-                np.save(output_dir / f'poses-{model_names[i]}_norm.npy', poses_norm)
+                    ViewRenderer(self.model_method, self.model_names[i], model_dir, load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
+                np.save(output_dir / f'poses-{self.model_names[i]}_norm.npy', poses_norm)
 
         if self.run_sfm:
             shutil.rmtree(sfm_dir, ignore_errors=True)
@@ -172,10 +162,10 @@ class Registration:
             # uses hemi views, maybe training views
             c1 = not self.training_poses or self.render_hemi_views
             # uses hemi + training views
-            c2 = self.training_poses and self.render_hemi_views and not self.sfm_wo_training_views
+            c2 = self.training_poses and self.render_hemi_views and self.sfm_w_training_views
             # uses training views only
             c3 = self.training_poses and not self.render_hemi_views
-            for i, model_name in enumerate(model_names):
+            for i, model_name in enumerate(self.model_names):
                 files = os.listdir(output_dir / model_name)
                 if c1:
                     ids = set(rng.permutation(ks[i])[:np.floor(ls[i] * self.sfm_w_hemi_views).astype(int)])
@@ -199,7 +189,7 @@ class Registration:
         if self.compute_trans:
             # sfm-to-norm transforms
             Ts_sfm_norm = {}
-            for model_name in model_names:
+            for model_name in self.model_names:
                 n = len(poses_sfm[model_name])
                 print(f'Got {n} poses for {model_name} from SfM.')
                 if n < 2:
@@ -220,45 +210,49 @@ class Registration:
             if not Ts_sfm_norm:
                 print(f'failed to recover any transform')
                 exit()
-            T_invs_sfm_norm = {model_name: np.linalg.inv(T_sfm_norm) for model_name, T_sfm_norm in Ts_sfm_norm.items()}
+            Ts_norm_sfm = {model_name: np.linalg.inv(T_sfm_norm) for model_name, T_sfm_norm in Ts_sfm_norm.items()}
             if self.model_gt_trans:
                 # mean world-to-sfm transform
-                T_world_sfm = avg_trans([T_invs_sfm_norm[model_name] @ Ts_gt_world_norm[i] for i, model_name in enumerate(Ts_sfm_norm)])
-                T_inv_world_sfm = np.linalg.inv(T_world_sfm)
+                T_world_sfm = avg_trans([Ts_norm_sfm[model_name] @ Ts_gt_world_norm[i] for i, model_name in enumerate(Ts_sfm_norm)])
+                T_sfm_world = np.linalg.inv(T_world_sfm)
                 np.save(output_dir / f'T~{cfg}.npy', T_world_sfm)
-            for i, model_name in enumerate(model_names):
+            for i, model_name in enumerate(self.model_names):
                 if model_name not in Ts_sfm_norm:
                     print(f'failed to recover {model_name}_norm-to-world transform')
                     continue
-                T_pred = T_inv_world_sfm @ T_invs_sfm_norm[model_name]
+                T_pred = T_sfm_world @ Ts_norm_sfm[model_name]
                 print(f'\n{model_name}_norm-to-world:')
                 print('pred transform\n', T_pred)
                 if self.model_gt_trans:
-                    T_gt = T_invs_gt_world_norm[i]
+                    T_gt = Ts_gt_norm_world[i]
                     print('gt transform\n', T_gt)
                     r, t, s = compute_trans_diff(T_gt, T_pred)
                     print(f'rotation error {r:.3g}')
                     print(f'translation error {t:.3g}')
                     print(f'scale error {s:.3g}')
 
-        # if self.vis:
-        #     T_world_sfm = np.load(output_dir / f'T~{cfg}.npy')
-        #     T_inv_world_sfm = np.linalg.inv(T_world_sfm)
-        #     _, s = decompose_sim3(T_world_sfm)
-        #     S_world_sfm = np.diag((s, s, s, 1)).astype(np.float32)
-        #     Ts_norm_sfm = {}
-        #     for model_name in model_names:
-        #         T_sfm_norm_path = output_dir / f'T~{cfg}-{model_name}_norm.npy'
-        #         if T_sfm_norm_path.exists():
-        #             Ts_norm_sfm[model_name] = np.linalg.inv(np.load(T_sfm_norm_path))
-        #     colors = cycle(plt.cm.tab20.colors)
-        #     vis = Visualizer(show_frame=True)
-        #     vis.add_trajectory([T_inv_world_sfm @ Ts_norm_sfm[model_name] for model_name in Ts_norm_sfm], pose_spec=0, cam_size=0.3, color=next(colors))
-        #     if self.model_gt_trans:
-        #         vis.add_trajectory(T_invs_gt_world_norm, pose_spec=0, cam_size=0.28, color=next(colors))
-        #     for i, model_name in enumerate(model_names):
-        #         vis.add_trajectory(T_inv_world_sfm @ np.stack([pose_sfm[1] for pose_sfm in poses_sfm[model_name]]) @ S_world_sfm, cam_size=0.3, color=next(colors))
-        #         if self.model_gt_trans:
-        #             poses_norm = np.load(output_dir / f'poses-{model_name}_norm.npy')
-        #             vis.add_trajectory(T_invs_gt_world_norm[i] @ poses_norm @ Ss_gt_world_norm[i], cam_size=0.28, color=next(colors))
-        #     vis.show()
+        if self.vis:
+            T_world_sfm = np.load(output_dir / f'T~{cfg}.npy')
+            T_sfm_world = np.linalg.inv(T_world_sfm)
+            _, s = decompose_sim3(T_world_sfm)
+            S_world_sfm = np.diag((s, s, s, 1)).astype(np.float32)
+            Ts_norm_sfm = {}
+            for model_name in self.model_names:
+                T_sfm_norm_path = output_dir / f'T~{cfg}-{model_name}_norm.npy'
+                if T_sfm_norm_path.exists():
+                    Ts_norm_sfm[model_name] = np.linalg.inv(np.load(T_sfm_norm_path))
+            colors = cycle(plt.cm.tab20.colors)
+            vis = Visualizer(show_frame=True)
+            vis.add_trajectory([T_sfm_world @ Ts_norm_sfm[model_name] for model_name in Ts_norm_sfm], pose_spec=0, cam_size=0.3, color=next(colors))
+            if self.model_gt_trans:
+                vis.add_trajectory(Ts_gt_norm_world, pose_spec=0, cam_size=0.28, color=next(colors))
+            for i, model_name in enumerate(self.model_names):
+                vis.add_trajectory(T_sfm_world @ np.stack([pose_sfm[1] for pose_sfm in poses_sfm[model_name]]) @ S_world_sfm, cam_size=0.3, color=next(colors))
+                if self.model_gt_trans:
+                    poses_norm = np.load(output_dir / f'poses-{model_name}_norm.npy')
+                    vis.add_trajectory(Ts_gt_norm_world[i] @ poses_norm @ Ss_gt_world_norm[i], cam_size=0.28, color=next(colors))
+            vis.show()
+
+
+if __name__ == '__main__':
+    tyro.cli(Registration).main()

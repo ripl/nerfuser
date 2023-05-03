@@ -32,7 +32,7 @@ conda create -n nerfuser -y python=3.9 && conda activate nerfuser
     pip install imageio-ffmpeg
     ```
 
-### 3. Install NeRFuser
+### 2. Install NeRFuser
 
 ```bash
 pip install git+https://github.com/ripl/nerfuser

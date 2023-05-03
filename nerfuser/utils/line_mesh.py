@@ -104,7 +104,7 @@ class LineMesh(object):
 
 
 def main():
-    print("Demonstrating LineMesh vs LineSet")
+    print('Demonstrating LineMesh vs LineSet')
     # Create Line Set
     points = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1],
               [0, 1, 1], [1, 1, 1]]
@@ -131,5 +131,5 @@ def main():
         [line_set, *line_mesh1_geoms, *line_mesh2_geoms])
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
