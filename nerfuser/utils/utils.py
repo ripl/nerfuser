@@ -15,15 +15,13 @@ def gen_lookat_pose(c, t, u=None, pose_spec=2, pose_type='c2w'):
                 2: x->right, y->up, z->back
         we assume world frame spec is 0
         pose_type: one of {'c2w', 'w2c'} """
-    def cross(a, b) -> np.ndarray:
-        return np.cross(a, b)
     if u is None:
         u = np.array([0, 0, 1])
     y = t - c
     y = y / np.linalg.norm(y)
-    x = cross(y, u)
+    x = np.cross(y, u)
     x = x / np.linalg.norm(x)
-    z = cross(x, y)
+    z = np.cross(x, y)
     R = np.array([x, y, z]).T
     if pose_spec == 1:
         R = R @ np.array([[1, 0, 0],

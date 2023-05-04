@@ -25,7 +25,6 @@ def align_vector_to_another(a=np.array([0, 0, 1]), b=np.array([1, 0, 0])):
         return None, None
     axis_ = axis_ / n
     angle = np.arccos(np.dot(a, b))
-
     return axis_, angle
 
 

@@ -55,8 +55,8 @@ class Blending:
     """source of sfm to normalized nerf transforms; if "gt", will use "model-gt-trans" and test-frame must be "world" """
     blend_methods: List[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
     """blending methods"""
-    tau: float = 2.5
-    """maximum blending distance ratio; must be larger than 1"""
+    tau: Optional[float] = 2.5
+    """maximum blending distance ratio; must be larger than 1; use None for infinity"""
     gammas: List[float] = field(default_factory=lambda: [4])
     """blending rates for all applicable methods"""
     fps: int = 8

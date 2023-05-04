@@ -40,10 +40,27 @@ pip install git+https://github.com/ripl/nerfuser
 
 ## Run
 
-Use command `ns-fuse`. Usage examples:
+Run `ns-fuse -h` for details. Usage examples:
 
 ```bash
-ns-fuse --model-dirs models/ttic/common_large/A/nerfacto/2023-04-16_185306/nerfstudio_models/ models/ttic/common_large/B/nerfacto/2023-04-16_185245/nerfstudio_models/ models/ttic/common_large/C/nerfacto/2023-04-16_185251/nerfstudio_models/ --name ttic/common_large --model-gt-trans I --cam-info data/ttic/common_large/test/transforms.json --render-views --run-sfm --compute-trans --test-poses data/ttic/common_large/test/transforms.json --test-frame world --blend-views --eval-blend
+ns-fuse \
+    --model-dirs models/ttic/common_large/A/nerfacto/2023-04-16_185306/nerfstudio_models/ models/ttic/common_large/B/nerfacto/2023-04-16_185245/nerfstudio_models/ models/ttic/common_large/C/nerfacto/2023-04-16_185251/nerfstudio_models/ \
+    --name ttic/common_large \
+    --model-gt-trans I \
+    --cam-info data/ttic/common_large/test/transforms.json \
+    --render-views \
+    --run-sfm \
+    --compute-trans \
+    --test-poses data/ttic/common_large/test/transforms.json \
+    --test-frame world \
+    --blend-views \
+    --eval-blend
 
-ns-fuse --model-dirs models/ttic/common_large/A/nerfacto/2023-04-16_185306/nerfstudio_models/ models/ttic/common_large/B/nerfacto/2023-04-16_185245/nerfstudio_models/ models/ttic/common_large/C/nerfacto/2023-04-16_185251/nerfstudio_models/ --name ttic/common_large --render-views --run-sfm --compute-trans --blend-views
+ns-fuse \
+    --model-dirs models/ttic/common_large/A/nerfacto/2023-04-16_185306/nerfstudio_models/ models/ttic/common_large/B/nerfacto/2023-04-16_185245/nerfstudio_models/ models/ttic/common_large/C/nerfacto/2023-04-16_185251/nerfstudio_models/ \
+    --name ttic/common_large \
+    --render-views \
+    --run-sfm \
+    --compute-trans \
+    --blend-views
 ```
