@@ -15,7 +15,7 @@ from torchmetrics import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from tqdm import tqdm
 
-from nerfuser.utils.utils import complete_transform, gen_circular_poses
+from nerfuser.utils.utils import complete_transform, gen_hemispheric_poses
 from nerfuser.view_blender import ViewBlender
 
 
@@ -161,7 +161,7 @@ class Blending:
                         d = max(d, np.linalg.norm(T_invs[i, :3, 3] - T_invs[j, :3, 3]))
                 poses = np.array([[0, 1, 0],
                                   [0, 0, -1],
-                                  [-1, 0, 0]], dtype=np.float32) @ np.array(gen_circular_poses(d * 0.8 if d else 1, 0, n=60))
+                                  [-1, 0, 0]], dtype=np.float32) @ np.array(gen_hemispheric_poses(d * 0.8 if d else 1, np.pi / 10, gamma_hi=np.pi / 10, m=1, n=60))
             with torch.no_grad():
                 ViewBlender(self.model_method, self.model_names, self.model_dirs, Ts, self.tau, load_step=self.step, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
 
