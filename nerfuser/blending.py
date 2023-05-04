@@ -37,7 +37,7 @@ class Blending:
     """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity"; only applicable when trans-src is "gt" """
     step: Optional[int] = None
     """model step to load"""
-    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400, 400, 400, 300, 800, 600])
+    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
     """downscale factor for NeRF rendering"""
@@ -55,9 +55,9 @@ class Blending:
     """source of sfm to normalized nerf transforms; if "gt", will use "model-gt-trans" and test-frame must be "world" """
     blend_methods: List[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
     """blending methods"""
-    tau: float = 3
+    tau: float = 2.5
     """maximum blending distance ratio; must be larger than 1"""
-    gammas: List[float] = field(default_factory=lambda: [3])
+    gammas: List[float] = field(default_factory=lambda: [4])
     """blending rates for all applicable methods"""
     fps: int = 8
     """frame rate for video output"""
@@ -115,18 +115,11 @@ class Blending:
                     blend_methods[f'{blend_method}_g{g:.2g}'] = (blend_method, g)
 
         if self.blend_views:
-            if self.test_poses:
-                with open(self.test_poses) as f:
-                    transforms = json.load(f)
-                pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in transforms['frames']}
-                poses = np.array([pose_dict[k] for k in sorted(pose_dict.keys())])
-            else:
-                poses = np.array(gen_circular_poses(1, 0, n=60))
             Ts = []
             if self.trans_src == 'gt':
                 assert self.test_frame == 'world', 'test poses must be specified in world coordinates to utilize ground-truth world-to-nerf transforms'
                 assert self.model_gt_trans, 'ground-truth world-to-nerf transforms must be specified'
-                Ts_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32)[None], (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
+                Ts_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32), (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
                 for i, model_dir in enumerate(self.model_dirs):
                     with open(model_dir.parent / 'dataparser_transforms.json') as f:
                         transforms = json.load(f)
@@ -136,7 +129,7 @@ class Blending:
                 if not self.reg_name:
                     self.reg_name = self.name
                 reg_dir = Path(self.reg_dir) / self.reg_name
-                valid_ids = []
+                keep_ids = []
                 if self.test_frame == 'world':
                     T_sfm_path = reg_dir / f'T~{self.trans_src}.npy'
                     if not T_sfm_path.exists():
@@ -148,13 +141,29 @@ class Blending:
                     T_path = reg_dir / f'T~{self.trans_src}-{model_name}_norm.npy'
                     if T_path.exists():
                         Ts.append(np.load(T_path) @ T_sfm)
-                        valid_ids.append(i)
+                        keep_ids.append(i)
                     else:
                         print(f'sfm-to-{model_name}_norm transform not found. Skipping.')
-                self.model_names = [self.model_names[i] for i in valid_ids]
-                self.model_dirs = [self.model_dirs[i] for i in valid_ids]
+                self.model_names = [self.model_names[i] for i in keep_ids]
+                self.model_dirs = [self.model_dirs[i] for i in keep_ids]
+            Ts = np.stack(Ts)
+            if self.test_poses:
+                with open(self.test_poses) as f:
+                    transforms = json.load(f)
+                pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in transforms['frames']}
+                poses = np.array([pose_dict[k] for k in sorted(pose_dict.keys())])
+            else:
+                n_models = len(self.model_dirs)
+                T_invs = np.linalg.inv(Ts)
+                d = 0
+                for i in range(n_models - 1):
+                    for j in range(i + 1, n_models):
+                        d = max(d, np.linalg.norm(T_invs[i, :3, 3] - T_invs[j, :3, 3]))
+                poses = np.array([[0, 1, 0],
+                                  [0, 0, -1],
+                                  [-1, 0, 0]], dtype=np.float32) @ np.array(gen_circular_poses(d * 0.8 if d else 1, 0, n=60))
             with torch.no_grad():
-                ViewBlender(self.model_method, self.model_names, self.model_dirs, np.stack(Ts), self.tau, load_step=self.step, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
+                ViewBlender(self.model_method, self.model_names, self.model_dirs, Ts, self.tau, load_step=self.step, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
 
         if self.evaluate:
             assert self.test_poses, 'must provide test_poses json to evaluate'

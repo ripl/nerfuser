@@ -57,7 +57,7 @@ def gen_circular_poses(r, h, target=np.zeros(3), n=10, pose_spec=2):
     return gen_elliptical_poses(r, r, 0, h, target=target, n=n, pose_spec=pose_spec)
 
 
-def gen_hemispherical_poses(r, gamma_lo, gamma_hi=None, target=np.zeros(3), m=3, n=10, pose_spec=2):
+def gen_hemispheric_poses(r, gamma_lo, gamma_hi=None, target=np.zeros(3), m=3, n=10, pose_spec=2):
     if gamma_hi is None:
         gamma_hi = gamma_lo
         gamma_lo = 0

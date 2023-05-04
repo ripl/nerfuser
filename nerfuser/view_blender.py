@@ -12,7 +12,7 @@ from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.models.nerfacto import NerfactoModelConfig
 from tqdm import trange
 
-from nerfuser.my_components import MyRGBRenderer, nerfacto_get_outputs
+from nerfuser.components import WeightedRGBRenderer, nerfacto_get_outputs
 from nerfuser.utils.utils import complete_transform, decompose_sim3, img_cat
 
 
@@ -86,15 +86,15 @@ class ViewBlender:
             else:
                 cams = Cameras(poses[i, :, :3].cpu(), **cam_info).to(self.device)
             dists = torch.linalg.norm(poses[i, :, :3, 3], dim=-1)
-            valids = dists / dists.min() < self.tau
+            keep_flags = dists / dists.min() < self.tau
             rgb_chunks = defaultdict(list)
             if save_extras:
                 models = self.models
                 cam_ray_bundles = [cams.generate_rays(j) for j in range(n)]
                 ws_chunks = defaultdict(list)
             else:
-                models = [self.models[j] for j in range(n) if valids[j]]
-                cam_ray_bundles = [cams.generate_rays(j) for j in range(n) if valids[j]]
+                models = [self.models[j] for j in range(n) if keep_flags[j]]
+                cam_ray_bundles = [cams.generate_rays(j) for j in range(n) if keep_flags[j]]
             for k in trange(0, n_rays, self.chunk_size, leave=False):
                 start_idx = k
                 end_idx = k + self.chunk_size
@@ -103,7 +103,7 @@ class ViewBlender:
                     cam_ray_bundle = cam_ray_bundles[j]
                     ray_bundle = cam_ray_bundle.get_row_major_sliced_ray_bundle(start_idx, end_idx)
                     output = model(ray_bundle)
-                    if not save_extras or valids[j]:
+                    if not save_extras or keep_flags[j]:
                         for key in output:
                             outputs[key].append(output[key])
                     if save_extras:
@@ -111,7 +111,7 @@ class ViewBlender:
                 for key in outputs:
                     outputs[key] = torch.stack(outputs[key])
                 for method in methods:
-                    val = self.blend(*methods[method], outputs, poses[i, valids, :3, 3], save_extras, valids)
+                    val = self.blend(*methods[method], outputs, poses[i, keep_flags, :3, 3], save_extras, keep_flags)
                     rgb_chunks[method].append(val[0].cpu())
                     if save_extras:
                         ws_chunks[method].append(val[1].cpu())
@@ -131,9 +131,9 @@ class ViewBlender:
                 imageio.v3.imwrite(output_dir / f'{method}.mp4', imgs[method], fps=animate, quality=10)
 
     @classmethod
-    def blend(cls, method, g, data, c2w_ts, save_extras, valid_model_mask):
-        n_models = len(valid_model_mask)
-        n_valid_models, n_rays = data['weights'].shape[:2]
+    def blend(cls, method, g, data, c2w_ts, save_extras, keep_flags):
+        n_models = len(keep_flags)
+        n_keeps, n_rays = data['weights'].shape[:2]
         if method in ['nearest', 'idw2']:
             if method == 'nearest':
                 g = torch.inf
@@ -142,7 +142,7 @@ class ViewBlender:
             val = (data['rgb'] * ws).sum(dim=0)
             if save_extras:
                 ws_full = torch.zeros(n_models, n_rays, 1, device=ws.device)
-                ws_full[valid_model_mask] = ws
+                ws_full[keep_flags] = ws
                 return val, ws_full
             return val,
         if method == 'idw3':
@@ -151,7 +151,7 @@ class ViewBlender:
             val = (data['rgb'] * ws).sum(dim=0)
             if save_extras:
                 ws_full = torch.zeros(n_models, n_rays, 1, device=ws.device)
-                ws_full[valid_model_mask] = ws
+                ws_full[keep_flags] = ws
                 return val, ws_full
             return val,
         if method == 'idw4':
@@ -159,17 +159,17 @@ class ViewBlender:
             merged_weights, merged_rgbs, merged_mids = cls.merge_ray_samples(data['weights'], data['rgbs'], data['deltas'])
             dists = torch.linalg.norm(c2w_ts[:, None, None, :] + data['direction'][..., None, :] * merged_mids, dim=-1)
             ws = cls.idw(dists, g)
-            w_bg = ws[..., [-1]] if bg == 'last_sample' else torch.full((n_valid_models, n_rays, 1), 1 / n_valid_models, device=ws.device)
+            w_bg = ws[..., [-1]] if bg == 'last_sample' else torch.full((n_keeps, n_rays, 1), 1 / n_keeps, device=ws.device)
             cs = merged_weights * ws[..., None]
             c_bg = (1 - data['accumulation']) * w_bg
             s = torch.cat([cs, c_bg[..., None, :]], dim=-2).sum(dim=[0, -2], keepdim=True)
             c = 1 / (cs.shape[0] * (cs.shape[-2] + 1))
             cs = torch.nan_to_num(cs / s, nan=c)
             c_bg = torch.nan_to_num(c_bg / s.squeeze(-2), nan=c)
-            val = MyRGBRenderer(background_color=bg)(merged_rgbs, cs, c_bg).sum(dim=0).clamp(min=0, max=1)
+            val = WeightedRGBRenderer(background_color=bg)(merged_rgbs, cs, c_bg).sum(dim=0).clamp(min=0, max=1)
             if save_extras:
                 ws_full = torch.zeros(n_models, n_rays, 1, device=ws.device)
-                ws_full[valid_model_mask] = torch.cat([cs, c_bg[..., None, :]], dim=-2).sum(dim=-2)
+                ws_full[keep_flags] = torch.cat([cs, c_bg[..., None, :]], dim=-2).sum(dim=-2)
                 return val, ws_full
             return val,
 

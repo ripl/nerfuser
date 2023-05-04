@@ -32,7 +32,7 @@ class Fuser:
     """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity" """
     step: Optional[int] = None
     """model step to load"""
-    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400, 400, 400, 300, 800, 600])
+    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
     """downscale factor for NeRF rendering"""
@@ -62,9 +62,9 @@ class Fuser:
     """source of sfm to normalized nerf transforms; if "gt", will use "model-gt-trans" and test-frame must be "world" """
     blend_methods: List[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
     """blending methods"""
-    tau: float = 3
+    tau: float = 2.5
     """maximum blending distance ratio; must be larger than 1"""
-    gammas: List[float] = field(default_factory=lambda: [3])
+    gammas: List[float] = field(default_factory=lambda: [4])
     """blending rates for all applicable methods"""
     fps: int = 8
     """frame rate for video output"""

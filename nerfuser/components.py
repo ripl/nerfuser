@@ -1,11 +1,8 @@
-from typing import Union
-
 import torch
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.model_components.renderers import RGBRenderer
 from torchtyping import TensorType
-from typing_extensions import Literal
 
 
 def nerfacto_get_outputs(self, ray_bundle: RayBundle):
@@ -33,59 +30,36 @@ def nerfacto_get_outputs(self, ray_bundle: RayBundle):
     }
     return outputs
 
-class MyRGBRenderer(RGBRenderer):
-    """Weighted volumetic rendering.
 
-    Args:
-        background_color: Background color as RGB. Uses random colors if None.
-    """
+class WeightedRGBRenderer(RGBRenderer):
+    """Weighted volumetic rendering."""
 
-    @classmethod
-    def combine_rgb(
-        cls,
-        rgb: TensorType["bs":..., "num_samples", 3],
-        ws: TensorType["bs":..., "num_samples", 1],
-        bg_w: TensorType["bs":..., 1],
-        background_color: Union[Literal["random", "last_sample"], TensorType[3]] = "random"
-    ) -> TensorType["bs":..., 3]:
+    def forward(
+        self,
+        rgb: TensorType['bs': ..., 'n_samples', 3],
+        ws: TensorType['bs': ..., 'n_samples', 1],
+        bg_w: TensorType['bs': ..., 1],
+    ) -> TensorType['bs': ..., 3]:
         """Composite samples along ray and render color image
 
         Args:
             rgb: RGB for each sample.
-            weights: Termination probability mass for each sample.
-            ws: Weights for each sample. E.g. from IDW.
-            background_color: Background color as RGB.
-            ray_indices: Ray index for each sample, used when samples are packed.
-            num_rays: Number of rays, used when samples are packed.
+            ws: Weighted termination probability mass for each sample.
+            bg_w: Weighted termination probability mass for the background.
 
         Returns:
-            Outputs rgb values.
+            Rendered RGB values.
         """
+
         comp_rgb = torch.sum(rgb * ws, dim=-2)
 
-        if background_color == 'last_sample':
+        if self.background_color == 'last_sample':
             background_color = rgb[..., -1, :]
-        elif background_color == 'random':
+        elif self.background_color == 'random':
             background_color = torch.rand_like(comp_rgb)
+        else:
+            background_color = self.background_color
 
         comp_rgb += background_color * bg_w
 
         return comp_rgb
-
-    def forward(
-        self,
-        rgb: TensorType["bs":..., "num_samples", 3],
-        ws: TensorType["bs":..., "num_samples", 1],
-        bg_w: TensorType["bs":..., 1],
-    ) -> TensorType["bs":..., 3]:
-        """Composite samples along ray and render color image
-
-        Args:
-            rgb: RGB for each sample.
-            ws: weighted termination probability mass for each sample.
-
-        Returns:
-            Outputs of rgb values.
-        """
-
-        return self.combine_rgb(rgb, ws, bg_w, background_color=self.background_color)

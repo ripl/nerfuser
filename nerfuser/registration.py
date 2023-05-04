@@ -20,7 +20,7 @@ from nerfstudio.process_data.hloc_utils import run_hloc
 
 from nerfuser.utils.utils import (avg_trans, complete_transform,
                                   compute_trans_diff, decompose_sim3,
-                                  extract_colmap_pose, gen_hemispherical_poses)
+                                  extract_colmap_pose, gen_hemispheric_poses)
 from nerfuser.utils.visualizer import Visualizer
 from nerfuser.view_renderer import ViewRenderer
 
@@ -43,7 +43,7 @@ class Registration:
     """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity" """
     step: Optional[int] = None
     """model step to load"""
-    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400, 400, 400, 300, 800, 600])
+    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
     """downscale factor for NeRF rendering"""
@@ -107,7 +107,7 @@ class Registration:
         Ss_norm_nerf = np.stack(Ss_norm_nerf)
         if self.model_gt_trans:
             # gt world-to-nerf transforms
-            Ts_gt_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32)[None], (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
+            Ts_gt_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32), (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
             # gt world-to-normalized transforms
             Ts_gt_world_norm = Ts_nerf_norm @ Ts_gt_world_nerf
             Ts_gt_norm_world = np.linalg.inv(Ts_gt_world_norm)
@@ -148,7 +148,7 @@ class Registration:
             cam_info['height'] = int(cam_info['height'])
             cam_info['width'] = int(cam_info['width'])
             for i, model_dir in enumerate(self.model_dirs):
-                poses_norm = complete_transform(np.array(gen_hemispherical_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
+                poses_norm = complete_transform(np.array(gen_hemispheric_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
                 if self.training_poses:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
                     poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.stack([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
@@ -187,7 +187,7 @@ class Registration:
                 poses_sfm[model_name].append((id, extract_colmap_pose(im_data)))
 
         if self.compute_trans:
-            # sfm-to-norm transforms
+            # sfm-to-normalized transforms
             Ts_sfm_norm = {}
             for model_name in self.model_names:
                 n = len(poses_sfm[model_name])
@@ -216,6 +216,8 @@ class Registration:
                 T_world_sfm = avg_trans([Ts_norm_sfm[model_name] @ Ts_gt_world_norm[i] for i, model_name in enumerate(Ts_sfm_norm)])
                 T_sfm_world = np.linalg.inv(T_world_sfm)
                 np.save(output_dir / f'T~{cfg}.npy', T_world_sfm)
+            else:
+                T_sfm_world = np.identity(4, dtype=np.float32)
             for i, model_name in enumerate(self.model_names):
                 if model_name not in Ts_sfm_norm:
                     print(f'failed to recover {model_name}_norm-to-world transform')
@@ -232,7 +234,7 @@ class Registration:
                     print(f'scale error {s:.3g}')
 
         if self.vis:
-            T_world_sfm = np.load(output_dir / f'T~{cfg}.npy')
+            T_world_sfm = np.load(output_dir / f'T~{cfg}.npy') if self.model_gt_trans else np.identity(4, dtype=np.float32)
             T_sfm_world = np.linalg.inv(T_world_sfm)
             _, s = decompose_sim3(T_world_sfm)
             S_world_sfm = np.diag((s, s, s, 1)).astype(np.float32)
@@ -241,7 +243,7 @@ class Registration:
                 T_sfm_norm_path = output_dir / f'T~{cfg}-{model_name}_norm.npy'
                 if T_sfm_norm_path.exists():
                     Ts_norm_sfm[model_name] = np.linalg.inv(np.load(T_sfm_norm_path))
-            colors = cycle(plt.cm.tab20.colors)
+            colors = cycle(plt.cm.tab20.colors if self.model_gt_trans else plt.cm.tab10.colors)
             vis = Visualizer(show_frame=True)
             vis.add_trajectory([T_sfm_world @ Ts_norm_sfm[model_name] for model_name in Ts_norm_sfm], pose_spec=0, cam_size=0.3, color=next(colors))
             if self.model_gt_trans:
