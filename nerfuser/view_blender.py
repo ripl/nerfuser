@@ -2,22 +2,18 @@ import logging
 import os
 import shutil
 from collections import defaultdict
+from types import MethodType
 
 import imageio
 import numpy as np
 import torch
-from tqdm import trange
-import mediapy as media
-
 from nerfstudio.cameras.cameras import Cameras
 from nerfstudio.data.scene_box import SceneBox
-from nerfuser.my_models import MyNerfactoModelConfig, MyRGBRenderer
-from nerfuser.utils.utils import (
-    complete_transform,
-    decompose_sim3,
-    idw,
-    img_cat,
-)
+from nerfstudio.models.nerfacto import NerfactoModelConfig
+from tqdm import trange
+
+from nerfuser.my_components import MyRGBRenderer, nerfacto_get_outputs
+from nerfuser.utils.utils import complete_transform, decompose_sim3, img_cat
 
 
 class ViewBlender:
@@ -37,14 +33,10 @@ class ViewBlender:
             state = torch.load(load_path, map_location=device)
             state = {key[7:]: val for key, val in state['pipeline'].items() if key.startswith('_model.')}
             if model_method == 'nerfacto':
-                model = MyNerfactoModelConfig().setup(scene_box=SceneBox(aabb=state['field.aabb']), num_train_data=len(state['field.embedding_appearance.embedding.weight'])).to(device)
+                model = NerfactoModelConfig().setup(scene_box=SceneBox(aabb=state['field.aabb']), num_train_data=len(state['field.embedding_appearance.embedding.weight'])).to(device)
+                model.get_outputs = MethodType(nerfacto_get_outputs, model)
                 if not chunk_size:
                     chunk_size = 1 << 16
-            # elif model_method == 'instant-ngp':
-            #     key = 'field.appearance_embedding.embedding.weight'
-            #     model = MyInstantNGPModelConfig().setup(scene_box=SceneBox(aabb=state['field.aabb']), num_train_data=len(state[key]) if key in state else None).to(device)
-            #     if not chunk_size:
-            #         chunk_size = 1 << 11
             model.load_state_dict(state)
             model.eval()
             self.models.append(model)
@@ -94,14 +86,15 @@ class ViewBlender:
             else:
                 cams = Cameras(poses[i, :, :3].cpu(), **cam_info).to(self.device)
             dists = torch.linalg.norm(poses[i, :, :3, 3], dim=-1)
-            valid_model_mask = dists / dists.min() < self.tau
-            cam_ray_bundles = [cams.generate_rays(j) for j in range(n)]
+            valids = dists / dists.min() < self.tau
             rgb_chunks = defaultdict(list)
             if save_extras:
                 models = self.models
+                cam_ray_bundles = [cams.generate_rays(j) for j in range(n)]
                 ws_chunks = defaultdict(list)
             else:
-                models = [model for model, valid in zip(self.models, valid_model_mask) if valid]
+                models = [self.models[j] for j in range(n) if valids[j]]
+                cam_ray_bundles = [cams.generate_rays(j) for j in range(n) if valids[j]]
             for k in trange(0, n_rays, self.chunk_size, leave=False):
                 start_idx = k
                 end_idx = k + self.chunk_size
@@ -110,7 +103,7 @@ class ViewBlender:
                     cam_ray_bundle = cam_ray_bundles[j]
                     ray_bundle = cam_ray_bundle.get_row_major_sliced_ray_bundle(start_idx, end_idx)
                     output = model(ray_bundle)
-                    if not save_extras or valid_model_mask[j]:
+                    if not save_extras or valids[j]:
                         for key in output:
                             outputs[key].append(output[key])
                     if save_extras:
@@ -118,7 +111,7 @@ class ViewBlender:
                 for key in outputs:
                     outputs[key] = torch.stack(outputs[key])
                 for method in methods:
-                    val = ViewBlender.blend(*methods[method], outputs, poses[i, valid_model_mask, :3, 3], save_extras, valid_model_mask)
+                    val = self.blend(*methods[method], outputs, poses[i, valids, :3, 3], save_extras, valids)
                     rgb_chunks[method].append(val[0].cpu())
                     if save_extras:
                         ws_chunks[method].append(val[1].cpu())
@@ -137,14 +130,15 @@ class ViewBlender:
             for method in methods:
                 imageio.v3.imwrite(output_dir / f'{method}.mp4', imgs[method], fps=animate, quality=10)
 
-    def blend(method, g, data, c2w_ts, save_extras, valid_model_mask):
+    @classmethod
+    def blend(cls, method, g, data, c2w_ts, save_extras, valid_model_mask):
         n_models = len(valid_model_mask)
         n_valid_models, n_rays = data['weights'].shape[:2]
         if method in ['nearest', 'idw2']:
             if method == 'nearest':
                 g = torch.inf
             dists = torch.linalg.norm(c2w_ts, dim=-1)
-            ws = idw(dists, g)[:, None, None].broadcast_to(-1, n_rays, -1)
+            ws = cls.idw(dists, g)[:, None, None].broadcast_to(-1, n_rays, -1)
             val = (data['rgb'] * ws).sum(dim=0)
             if save_extras:
                 ws_full = torch.zeros(n_models, n_rays, 1, device=ws.device)
@@ -153,7 +147,7 @@ class ViewBlender:
             return val,
         if method == 'idw3':
             dists = torch.linalg.norm(c2w_ts[:, None, :] + data['direction'] * data['depth'], dim=-1)
-            ws = idw(dists, g)[..., None]
+            ws = cls.idw(dists, g)[..., None]
             val = (data['rgb'] * ws).sum(dim=0)
             if save_extras:
                 ws_full = torch.zeros(n_models, n_rays, 1, device=ws.device)
@@ -162,9 +156,9 @@ class ViewBlender:
             return val,
         if method == 'idw4':
             bg = 'last_sample'
-            merged_weights, merged_rgbs, merged_mids = ViewBlender.merge_ray_samples(data['weights'], data['rgbs'], data['deltas'])
+            merged_weights, merged_rgbs, merged_mids = cls.merge_ray_samples(data['weights'], data['rgbs'], data['deltas'])
             dists = torch.linalg.norm(c2w_ts[:, None, None, :] + data['direction'][..., None, :] * merged_mids, dim=-1)
-            ws = idw(dists, g)
+            ws = cls.idw(dists, g)
             w_bg = ws[..., [-1]] if bg == 'last_sample' else torch.full((n_valid_models, n_rays, 1), 1 / n_valid_models, device=ws.device)
             cs = merged_weights * ws[..., None]
             c_bg = (1 - data['accumulation']) * w_bg
@@ -179,6 +173,13 @@ class ViewBlender:
                 return val, ws_full
             return val,
 
+    @staticmethod
+    def idw(dists, g):
+        """ dists: [n_dists, ...] """
+        t = dists.unsqueeze(1) / dists.unsqueeze(0)
+        return 1 / (t**g).sum(dim=1)
+
+    @staticmethod
     def merge_ray_samples(weights, rgbs, deltas):
         # weights (n_models, n_rays, n_samples, 1)
         # rgbs (n_models, n_rays, n_samples, 3)

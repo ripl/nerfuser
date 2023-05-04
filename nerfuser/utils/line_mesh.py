@@ -49,8 +49,7 @@ class LineMesh(object):
             radius {float} -- radius of cylinder (default: {0.15})
         """
         self.points = np.array(points)
-        self.lines = np.array(
-            lines) if lines is not None else self.lines_from_ordered_points(self.points)
+        self.lines = np.array(lines) if lines is not None else self.lines_from_ordered_points(self.points)
         self.colors = np.array(colors)
         self.radius = radius
         self.cylinder_segments = []
@@ -78,14 +77,11 @@ class LineMesh(object):
             # Get translation vector
             translation = first_points[i, :] + line_segment * line_length * 0.5
             # create cylinder and apply transforms
-            cylinder_segment = o3d.geometry.TriangleMesh.create_cylinder(
-                self.radius, line_length)
-            cylinder_segment = cylinder_segment.translate(
-                translation, relative=False)
+            cylinder_segment = o3d.geometry.TriangleMesh.create_cylinder(self.radius, line_length)
+            cylinder_segment = cylinder_segment.translate(translation, relative=False)
             if axis is not None:
                 axis_a = axis * angle
-                cylinder_segment = cylinder_segment.rotate(
-                    R=o3d.geometry.get_rotation_matrix_from_axis_angle(axis_a))
+                cylinder_segment = cylinder_segment.rotate(R=o3d.geometry.get_rotation_matrix_from_axis_angle(axis_a))
             # color cylinder
             color = self.colors if self.colors.ndim == 1 else self.colors[i, :]
             cylinder_segment.paint_uniform_color(color)
@@ -106,10 +102,8 @@ class LineMesh(object):
 def main():
     print('Demonstrating LineMesh vs LineSet')
     # Create Line Set
-    points = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1],
-              [0, 1, 1], [1, 1, 1]]
-    lines = [[0, 1], [0, 2], [1, 3], [2, 3], [4, 5], [4, 6], [5, 7], [6, 7],
-             [0, 4], [1, 5], [2, 6], [3, 7]]
+    points = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]]
+    lines = [[0, 1], [0, 2], [1, 3], [2, 3], [4, 5], [4, 6], [5, 7], [6, 7], [0, 4], [1, 5], [2, 6], [3, 7]]
     colors = [[1, 0, 0] for i in range(len(lines))]
 
     line_set = o3d.geometry.LineSet()
@@ -127,8 +121,7 @@ def main():
     line_mesh2 = LineMesh(points, radius=0.03)
     line_mesh2_geoms = line_mesh2.cylinder_segments
 
-    o3d.visualization.draw_geometries(
-        [line_set, *line_mesh1_geoms, *line_mesh2_geoms])
+    o3d.visualization.draw_geometries([line_set, *line_mesh1_geoms, *line_mesh2_geoms])
 
 
 if __name__ == '__main__':

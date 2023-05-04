@@ -46,10 +46,10 @@ class Registration:
     cam_info: Union[str, List[float]] = field(default_factory=lambda: [400, 400, 400, 300, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
-    """downsample factor for NeRF rendering"""
+    """downscale factor for NeRF rendering"""
     training_poses: Optional[List[str]] = None
     """paths to training poses defined in models' local coordinate systems; if present, will be used to render training views and to determine the number of hemispheric poses"""
-    n_hemi_poses: int = 32
+    n_hemi_poses: int = 30
     """number of hemispheric poses; only applicable when training-poses is not present"""
     render_hemi_views: bool = False
     """use 1.3x hemispheric poses for rendering"""

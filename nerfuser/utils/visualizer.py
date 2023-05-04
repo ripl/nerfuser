@@ -1,17 +1,18 @@
-import os
-import sys
-
 import numpy as np
 import open3d as o3d
 
-sys.path.insert(0, os.path.dirname(__file__))
-from line_mesh import LineMesh  # noqa: E402
+from nerfuser.utils.line_mesh import LineMesh
 
 
 class Visualizer:
-    def __init__(self, show_frame=False, pt_size=1) -> None:
+    def __init__(self, w=None, h=None, show_frame=False, pt_size=1) -> None:
         self.o3d_vis = o3d.visualization.Visualizer()
-        self.o3d_vis.create_window()
+        kwargs = {}
+        if w is not None:
+            kwargs['width'] = w
+        if h is not None:
+            kwargs['height'] = h
+        self.o3d_vis.create_window(**kwargs)
         self.o3d_vis.get_render_option().point_size = pt_size
         if show_frame:
             self.o3d_vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame())
@@ -88,3 +89,5 @@ class Visualizer:
 
     def show(self):
         self.o3d_vis.run()
+        self.o3d_vis.destroy_window()
+        del self.o3d_vis

@@ -40,7 +40,7 @@ class Blending:
     cam_info: Union[str, List[float]] = field(default_factory=lambda: [400, 400, 400, 300, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
-    """downsample factor for NeRF rendering"""
+    """downscale factor for NeRF rendering"""
     test_poses: Optional[str] = None
     """path to json containing test poses; will use circular poses if not specified"""
     test_frame: Literal['sfm', 'world'] = 'sfm'
@@ -55,7 +55,7 @@ class Blending:
     """source of sfm to normalized nerf transforms; if "gt", will use "model-gt-trans" and test-frame must be "world" """
     blend_methods: List[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
     """blending methods"""
-    tau: float = 2
+    tau: float = 3
     """maximum blending distance ratio; must be larger than 1"""
     gammas: List[float] = field(default_factory=lambda: [3])
     """blending rates for all applicable methods"""
