@@ -18,7 +18,7 @@ from nerfstudio.process_data.colmap_utils import (CameraModel,
                                                   run_colmap)
 from nerfstudio.process_data.hloc_utils import run_hloc
 
-from nerfuser.utils.utils import (avg_trans, complete_transform,
+from nerfuser.utils.utils import (avg_trans, complete_trans,
                                   compute_trans_diff, decompose_sim3,
                                   extract_colmap_pose, gen_hemispheric_poses)
 from nerfuser.utils.visualizer import Visualizer
@@ -102,7 +102,7 @@ class Registration:
             s = transforms['scale']
             S_nerf_norm = np.diag((s, s, s, 1)).astype(np.float32)
             Ss_norm_nerf.append(np.linalg.inv(S_nerf_norm))
-            Ts_nerf_norm.append(S_nerf_norm @ complete_transform(np.array(transforms['transform'], dtype=np.float32)))
+            Ts_nerf_norm.append(S_nerf_norm @ complete_trans(np.array(transforms['transform'], dtype=np.float32)))
         Ts_nerf_norm = np.stack(Ts_nerf_norm)
         Ss_norm_nerf = np.stack(Ss_norm_nerf)
         if self.model_gt_trans:
@@ -148,7 +148,7 @@ class Registration:
             cam_info['height'] = int(cam_info['height'])
             cam_info['width'] = int(cam_info['width'])
             for i, model_dir in enumerate(self.model_dirs):
-                poses_norm = complete_transform(np.array(gen_hemispheric_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
+                poses_norm = complete_trans(np.array(gen_hemispheric_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
                 if self.training_poses:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
                     poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.stack([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))

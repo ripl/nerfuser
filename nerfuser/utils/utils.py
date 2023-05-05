@@ -65,7 +65,7 @@ def gen_hemispheric_poses(r, gamma_lo, gamma_hi=None, target=np.zeros(3), m=3, n
     return c2ws
 
 
-def complete_transform(T):
+def complete_trans(T):
     """ completes T to be [..., 4, 4] """
     s = T.shape
     if s[-2:] == (4, 4):
@@ -107,7 +107,7 @@ def avg_trans(Ts, s=None, avg_func=np.mean):
 def extract_colmap_pose(colmap_im):
     rotation = qvec2rotmat(colmap_im.qvec)
     translation = colmap_im.tvec[:, None]
-    w2c = complete_transform(np.concatenate((rotation, translation), axis=1))
+    w2c = complete_trans(np.concatenate((rotation, translation), axis=1))
     c2w = np.linalg.inv(w2c)
     # Convert from COLMAP's camera coordinate system (spec 1) to nerfstudio's (spec 2)
     c2w = c2w @ np.array([[1, 0, 0, 0],

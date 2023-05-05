@@ -1,4 +1,3 @@
-import logging
 import os
 import shutil
 from collections import defaultdict
@@ -13,7 +12,7 @@ from nerfstudio.models.nerfacto import NerfactoModelConfig
 from tqdm import trange
 
 from nerfuser.components import WeightedRGBRenderer, nerfacto_get_outputs
-from nerfuser.utils.utils import complete_transform, decompose_sim3, img_cat
+from nerfuser.utils.utils import complete_trans, decompose_sim3, img_cat
 
 
 class ViewBlender:
@@ -22,7 +21,6 @@ class ViewBlender:
         Args:
             transforms: an array of transforms, each of which transforms pts from the common coordinate system to a local normalized NeRF one
         """
-        assert model_method in ['nerfacto'], f'unknown model method: {model_method}'
         self.model_method = model_method
         self.model_names = model_names
         self.models = []
@@ -40,8 +38,8 @@ class ViewBlender:
             model.load_state_dict(state)
             model.eval()
             self.models.append(model)
-            logging.info(f'loaded checkpoint from {load_path}')
-        self.transforms = complete_transform(torch.as_tensor(transforms, device=device))
+            print(f'loaded checkpoint from {load_path}')
+        self.transforms = complete_trans(torch.as_tensor(transforms, device=device))
         _, s = decompose_sim3(self.transforms)
         S = torch.zeros(len(s), 4, 4, device=device)
         for i in range(3):
@@ -64,11 +62,11 @@ class ViewBlender:
             for model_name in self.model_names:
                 shutil.rmtree(output_dir / model_name, ignore_errors=True)
                 os.makedirs(output_dir / model_name)
-        c2ws = complete_transform(torch.as_tensor(c2ws, device=self.device))
+        c2ws = complete_trans(torch.as_tensor(c2ws, device=self.device))
         for p in cam_info:
             if isinstance(cam_info[p], np.ndarray):
                 cam_info[p] = torch.from_numpy(cam_info[p]).to(self.device)
-        poses = self.transforms.unsqueeze(0) @ c2ws.unsqueeze(1) @ self.S_inv.unsqueeze(0)
+        poses = self.transforms @ c2ws.unsqueeze(1) @ self.S_inv
         m, n = poses.shape[:2]
         if multi_cam:
             hs, ws = cam_info['height'], cam_info['width']
@@ -176,7 +174,7 @@ class ViewBlender:
     @staticmethod
     def idw(dists, g):
         """ dists: [n_dists, ...] """
-        t = dists.unsqueeze(1) / dists.unsqueeze(0)
+        t = dists.unsqueeze(1) / dists
         return 1 / (t**g).sum(dim=1)
 
     @staticmethod

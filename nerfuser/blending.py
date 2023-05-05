@@ -15,7 +15,7 @@ from torchmetrics import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from tqdm import tqdm
 
-from nerfuser.utils.utils import complete_transform, gen_hemispheric_poses
+from nerfuser.utils.utils import complete_trans, gen_hemispheric_poses
 from nerfuser.view_blender import ViewBlender
 
 
@@ -124,7 +124,7 @@ class Blending:
                     with open(model_dir.parent / 'dataparser_transforms.json') as f:
                         transforms = json.load(f)
                     s = transforms['scale']
-                    Ts.append(np.diag((s, s, s, 1)).astype(np.float32) @ complete_transform(np.array(transforms['transform'], dtype=np.float32)) @ Ts_world_nerf[i])
+                    Ts.append(np.diag((s, s, s, 1)).astype(np.float32) @ complete_trans(np.array(transforms['transform'], dtype=np.float32)) @ Ts_world_nerf[i])
             else:
                 if not self.reg_name:
                     self.reg_name = self.name
