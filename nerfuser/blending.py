@@ -55,6 +55,8 @@ class Blending:
     """source of sfm to normalized nerf transforms; if "gt", will use "model-gt-trans" and test-frame must be "world" """
     blend_methods: List[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
     """blending methods"""
+    use_global_metric: bool = False
+    """whether to use global metric for measuring distances"""
     tau: Optional[float] = 2.5
     """maximum blending distance ratio; must be larger than 1; use None for infinity"""
     gammas: List[float] = field(default_factory=lambda: [4])
@@ -163,7 +165,7 @@ class Blending:
                                   [0, 0, -1],
                                   [-1, 0, 0]], dtype=np.float32) @ np.array(gen_hemispheric_poses(d * 0.8 if d else 1, np.pi / 10, gamma_hi=np.pi / 10, m=1, n=60))
             with torch.no_grad():
-                ViewBlender(self.model_method, self.model_names, self.model_dirs, Ts, self.tau, load_step=self.step, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
+                ViewBlender(self.model_method, self.model_names, self.model_dirs, Ts, self.tau, load_step=self.step, use_global_metric=self.use_global_metric, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
 
         if self.evaluate:
             assert self.test_poses, 'must provide test_poses json to evaluate'

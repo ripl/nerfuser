@@ -83,7 +83,7 @@ def decompose_sim3(T):
     else:
         G = T.copy()
         s = np.linalg.det(G[..., :3, :3])**(1 / 3)
-    G[:3, :3] /= s[..., None, None]
+    G[..., :3, :3] /= s[..., None, None]
     return G, s
 
 
