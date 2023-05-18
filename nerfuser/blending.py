@@ -15,7 +15,7 @@ from torchmetrics import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from tqdm import tqdm
 
-from nerfuser.utils.utils import complete_trans, gen_hemispheric_poses
+from nerfuser.utils.utils import ch_pose_spec, complete_trans, gen_hemispheric_poses
 from nerfuser.view_blender import ViewBlender
 
 
@@ -140,15 +140,15 @@ class Blending:
                 else:
                     T_sfm = np.identity(4, dtype=np.float32)
                 for i, model_name in enumerate(self.model_names):
-                    T_path = reg_dir / f'T~{self.trans_src}-{model_name}_norm.npy'
+                    T_path = reg_dir / f'T~{self.trans_src}~{model_name}_norm.npy'
                     if T_path.exists():
                         Ts.append(np.load(T_path) @ T_sfm)
                         keep_ids.append(i)
                     else:
-                        print(f'sfm-to-{model_name}_norm transform not found. Skipping.')
+                        print(f'Skipping {model_name}: no registration result.')
                 self.model_names = [self.model_names[i] for i in keep_ids]
                 self.model_dirs = [self.model_dirs[i] for i in keep_ids]
-            Ts = np.stack(Ts)
+            Ts = np.array(Ts)
             if self.test_poses:
                 with open(self.test_poses) as f:
                     transforms = json.load(f)
@@ -161,9 +161,7 @@ class Blending:
                 for i in range(n_models - 1):
                     for j in range(i + 1, n_models):
                         d = max(d, np.linalg.norm(T_invs[i, :3, 3] - T_invs[j, :3, 3]))
-                poses = np.array([[0, 1, 0],
-                                  [0, 0, -1],
-                                  [-1, 0, 0]], dtype=np.float32) @ np.array(gen_hemispheric_poses(d * 0.8 if d else 1, np.pi / 10, gamma_hi=np.pi / 10, m=1, n=60))
+                poses = ch_pose_spec(np.array(gen_hemispheric_poses(d * 0.8 if d else 1, np.pi / 10, gamma_hi=np.pi / 10, m=1, n=60)), 0, 1, pose_type='w2c')
             with torch.no_grad():
                 ViewBlender(self.model_method, self.model_names, self.model_dirs, Ts, self.tau, load_step=self.step, use_global_metric=self.use_global_metric, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
 
@@ -187,9 +185,9 @@ class Blending:
                 gt = imageio.v3.imread(Path(self.test_poses).parent / filepath) / np.float32(255)
                 if self.downscale_factor:
                     gt = cv2.resize(gt, (w, h), interpolation=cv2.INTER_AREA)
-                gt = torch.tensor(gt, device=self.device).permute(2, 0, 1)[None]
+                gt = torch.as_tensor(gt, device=self.device).permute(2, 0, 1)[None]
                 for method in methods:
-                    pred = (torch.tensor(imageio.v3.imread(output_dir / method / f'{i:04d}.png'), device=self.device) / 255).permute(2, 0, 1)[None]
+                    pred = (torch.as_tensor(imageio.v3.imread(output_dir / method / f'{i:04d}.png'), device=self.device) / 255).permute(2, 0, 1)[None]
                     for j, metric in enumerate(metrics):
                         results[method][metric].append(metrics[metric](pred, gt).item())
             for metric in metrics:

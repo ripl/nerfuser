@@ -4,15 +4,35 @@ from nerfstudio.process_data.colmap_utils import qvec2rotmat
 from scipy.spatial.transform import Rotation
 
 
+def ch_pose_spec(T, src, tgt, pose_type='c2w'):
+    """ pose_spec:
+            0: x->right, y->front, z->up
+            1: x->right, y->down, z->front
+            2: x->right, y->up, z->back """
+    # x-to-0 transforms
+    Ts = np.array([np.identity(4),
+                   [[1, 0, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, -1, 0, 0],
+                    [0, 0, 0, 1]],
+                   [[1, 0, 0, 0],
+                    [0, 0, -1, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 0, 1]]], dtype=T.dtype)
+    s = T.shape[-2:]
+    T = complete_trans(T)
+    return (T @ np.linalg.inv(Ts[src]) @ Ts[tgt] if pose_type == 'c2w' else np.linalg.inv(Ts[tgt]) @ Ts[src] @ T)[..., :s[0], :s[1]]
+
+
 def gen_lookat_pose(c, t, u=None, pose_spec=2, pose_type='c2w'):
     """ generates a c2w pose
         c: camera center
         t: target to look at
         u: up vector
         pose_spec: cam frame spec
-                0: x->right, y->front, z->up
-                1: x->right, y->down, z->front
-                2: x->right, y->up, z->back
+            0: x->right, y->front, z->up
+            1: x->right, y->down, z->front
+            2: x->right, y->up, z->back
         we assume world frame spec is 0
         pose_type: one of {'c2w', 'w2c'} """
     if u is None:
@@ -22,15 +42,7 @@ def gen_lookat_pose(c, t, u=None, pose_spec=2, pose_type='c2w'):
     x = np.cross(y, u)
     x = x / np.linalg.norm(x)
     z = np.cross(x, y)
-    R = np.array([x, y, z]).T
-    if pose_spec == 1:
-        R = R @ np.array([[1, 0, 0],
-                         [0, 0, 1],
-                          [0, -1, 0]])
-    elif pose_spec == 2:
-        R = R @ np.array([[1, 0, 0],
-                         [0, 0, -1],
-                          [0, 1, 0]])
+    R = ch_pose_spec(np.array([x, y, z]).T, 0, pose_spec)
     if pose_type == 'w2c':
         R = R.T
         c = -R @ c
@@ -70,19 +82,20 @@ def complete_trans(T):
     s = T.shape
     if s[-2:] == (4, 4):
         return T
-    if isinstance(T, np.ndarray):
-        return np.concatenate((T, np.broadcast_to(np.array([0, 0, 0, 1], dtype=T.dtype), (*s[:-2], 1, 4))), axis=-2)
-    return torch.cat((T, torch.tensor([0, 0, 0, 1], dtype=T.dtype, device=T.device).broadcast_to(*s[:-2], 1, -1)), dim=-2)
+    T_comp = np.zeros((*s[:-2], 4, 4), dtype=T.dtype) if isinstance(T, np.ndarray) else torch.zeros(*s[:-2], 4, 4, dtype=T.dtype, device=T.device)
+    T_comp[..., :3, :s[-1]] = T
+    T_comp[..., 3, 3] = 1
+    return T_comp
 
 
 def decompose_sim3(T):
     """ T: [..., 4, 4] """
-    if isinstance(T, torch.Tensor):
-        G = T.clone()
-        s = torch.linalg.det(G[..., :3, :3])**(1 / 3)
-    else:
+    if isinstance(T, np.ndarray):
         G = T.copy()
         s = np.linalg.det(G[..., :3, :3])**(1 / 3)
+    else:
+        G = T.clone()
+        s = torch.linalg.det(G[..., :3, :3])**(1 / 3)
     G[..., :3, :3] /= s[..., None, None]
     return G, s
 
@@ -107,24 +120,15 @@ def avg_trans(Ts, s=None, avg_func=np.mean):
 def extract_colmap_pose(colmap_im):
     rotation = qvec2rotmat(colmap_im.qvec)
     translation = colmap_im.tvec[:, None]
+    # w2c of spec 1
     w2c = complete_trans(np.concatenate((rotation, translation), axis=1))
-    c2w = np.linalg.inv(w2c)
-    # Convert from COLMAP's camera coordinate system (spec 1) to nerfstudio's (spec 2)
-    c2w = c2w @ np.array([[1, 0, 0, 0],
-                         [0, -1, 0, 0],
-                         [0, 0, -1, 0],
-                         [0, 0, 0, 1]])
-    return c2w.astype(np.float32)
+    return ch_pose_spec(np.linalg.inv(w2c), 1, 2).astype(np.float32)
 
 
 def img_cat(imgs, axis, interval=0, color=255):
     assert axis in [0, 1], 'axis must be either 0 or 1'
     h, w, c = imgs[0].shape
-    if axis:
-        gap = np.broadcast_to(color, (h, interval, c))
-    else:
-        gap = np.broadcast_to(color, (interval, w, c))
-    gap = gap.astype(imgs[0].dtype)
+    gap = np.broadcast_to(color, (h, interval, c) if axis else (interval, w, c)).astype(imgs[0].dtype)
     t = [gap] * (len(imgs) * 2 - 1)
     t[::2] = imgs
     return np.concatenate(t, axis=axis)

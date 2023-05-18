@@ -5,9 +5,9 @@ from nerfstudio.model_components.renderers import RGBRenderer
 from torchtyping import TensorType
 
 
-def nerfacto_get_outputs(self, ray_bundle: RayBundle):
+def get_nerfacto_outputs(self, ray_bundle: RayBundle):
     ray_samples = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)[0]
-    field_outputs = self.field(ray_samples)
+    field_outputs = self.field(ray_samples, compute_normals=self.config.predict_normals)
 
     weights = ray_samples.get_weights(field_outputs[FieldHeadNames.DENSITY])
     rgbs = field_outputs[FieldHeadNames.RGB]
@@ -28,6 +28,11 @@ def nerfacto_get_outputs(self, ray_bundle: RayBundle):
         'deltas': deltas,  # (n_rays, n_samples, 1)
         'direction': ray_samples.frustums.directions[:, 0]  # (n_rays, 3)
     }
+    if self.config.predict_normals:
+        outputs.update({
+            'normals': self.normals_shader(self.renderer_normals(normals=field_outputs[FieldHeadNames.NORMALS], weights=weights)),  # computed normals from density gradients
+            'pred_normals': self.normals_shader(self.renderer_normals(field_outputs[FieldHeadNames.PRED_NORMALS], weights=weights))  # predicted normals from MLP
+        })
     return outputs
 
 

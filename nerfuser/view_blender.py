@@ -11,7 +11,7 @@ from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.models.nerfacto import NerfactoModelConfig
 from tqdm import trange
 
-from nerfuser.components import WeightedRGBRenderer, nerfacto_get_outputs
+from nerfuser.components import WeightedRGBRenderer, get_nerfacto_outputs
 from nerfuser.utils.utils import complete_trans, decompose_sim3, img_cat
 
 
@@ -33,7 +33,7 @@ class ViewBlender:
             state = {key[7:]: val for key, val in state['pipeline'].items() if key.startswith('_model.')}
             if model_method == 'nerfacto':
                 model = NerfactoModelConfig().setup(scene_box=SceneBox(aabb=state['field.aabb']), num_train_data=len(state['field.embedding_appearance.embedding.weight'])).to(device)
-                model.get_outputs = MethodType(nerfacto_get_outputs, model)
+                model.get_outputs = MethodType(get_nerfacto_outputs, model)
                 if not chunk_size:
                     chunk_size = 1 << 16
             model.load_state_dict(state)
@@ -184,7 +184,7 @@ class ViewBlender:
     @staticmethod
     def idw(dists, g):
         """ dists: [n_dists, ...] """
-        t = dists.unsqueeze(1) / dists
+        t = (dists.unsqueeze(1) / dists).nan_to_num(nan=1)
         return 1 / (t**g).sum(dim=1)
 
     @staticmethod

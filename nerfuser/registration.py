@@ -13,14 +13,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import tyro
-from nerfstudio.process_data.colmap_utils import (CameraModel,
-                                                  read_images_binary,
-                                                  run_colmap)
+from nerfstudio.process_data.colmap_utils import CameraModel, read_images_binary, run_colmap
 from nerfstudio.process_data.hloc_utils import run_hloc
 
-from nerfuser.utils.utils import (avg_trans, complete_trans,
-                                  compute_trans_diff, decompose_sim3,
-                                  extract_colmap_pose, gen_hemispheric_poses)
+from nerfuser.utils.utils import avg_trans, complete_trans, compute_trans_diff, decompose_sim3, extract_colmap_pose, gen_hemispheric_poses
 from nerfuser.utils.visualizer import Visualizer
 from nerfuser.view_renderer import ViewRenderer
 
@@ -88,12 +84,12 @@ class Registration:
                 cfg += f'_train{int(self.sfm_w_training_views)}'
         else:
             cfg = 'train' if self.training_poses else 'hemi'
-        sfm_dir = output_dir / f'sfm_{cfg}'
+        sfm_dir = output_dir / f'{self.sfm_tool}~{cfg}'
         log_dict = {attr: dict(zip(self.model_names, [str(model_dir) for model_dir in self.model_dirs])) if attr == 'model_dirs' else getattr(self, attr) for attr in ['model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'sfm_tool']}
         with open(output_dir / f'{cfg}.json', 'w') as f:
             json.dump(log_dict, f, indent=2)
 
-        # nerf-to-normalized transforms
+        # nerf-to-nerf_norm transforms
         Ts_nerf_norm = []
         Ss_norm_nerf = []
         for model_dir in self.model_dirs:
@@ -103,12 +99,12 @@ class Registration:
             S_nerf_norm = np.diag((s, s, s, 1)).astype(np.float32)
             Ss_norm_nerf.append(np.linalg.inv(S_nerf_norm))
             Ts_nerf_norm.append(S_nerf_norm @ complete_trans(np.array(transforms['transform'], dtype=np.float32)))
-        Ts_nerf_norm = np.stack(Ts_nerf_norm)
-        Ss_norm_nerf = np.stack(Ss_norm_nerf)
+        Ts_nerf_norm = np.array(Ts_nerf_norm)
+        Ss_norm_nerf = np.array(Ss_norm_nerf)
         if self.model_gt_trans:
             # gt world-to-nerf transforms
             Ts_gt_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32), (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
-            # gt world-to-normalized transforms
+            # gt world-to-nerf_norm transforms
             Ts_gt_world_norm = Ts_nerf_norm @ Ts_gt_world_nerf
             Ts_gt_norm_world = np.linalg.inv(Ts_gt_world_norm)
             _, s = decompose_sim3(Ts_gt_world_norm)
@@ -151,10 +147,10 @@ class Registration:
                 poses_norm = complete_trans(np.array(gen_hemispheric_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
                 if self.training_poses:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
-                    poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.stack([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
+                    poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.array([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
                 with torch.no_grad():
                     ViewRenderer(self.model_method, self.model_names[i], model_dir, load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
-                np.save(output_dir / f'poses-{self.model_names[i]}_norm.npy', poses_norm)
+                np.save(output_dir / f'poses~{self.model_names[i]}_norm.npy', poses_norm)
 
         if self.run_sfm:
             shutil.rmtree(sfm_dir, ignore_errors=True)
@@ -187,14 +183,14 @@ class Registration:
                 poses_sfm[model_name].append((id, extract_colmap_pose(im_data)))
 
         if self.compute_trans:
-            # sfm-to-normalized transforms
+            # sfm-to-nerf_norm transforms
             Ts_sfm_norm = {}
             for model_name in self.model_names:
                 n = len(poses_sfm[model_name])
                 print(f'Got {n} poses for {model_name} from SfM.')
                 if n < 2:
                     continue
-                poses_norm = np.load(output_dir / f'poses-{model_name}_norm.npy')
+                poses_norm = np.load(output_dir / f'poses~{model_name}_norm.npy')
                 s_lst = []
                 for i in range(n - 1):
                     for j in range(i + 1, n):
@@ -206,7 +202,7 @@ class Registration:
                 s = np.median(s_lst)
                 T = avg_trans([poses_norm[id] @ np.diag((s, s, s, 1)).astype(np.float32) @ np.linalg.inv(pose_sfm) for id, pose_sfm in poses_sfm[model_name]], s=s, avg_func=np.median)
                 Ts_sfm_norm[model_name] = T
-                np.save(output_dir / f'T~{cfg}-{model_name}_norm.npy', T)
+                np.save(output_dir / f'T~{cfg}~{model_name}_norm.npy', T)
             if not Ts_sfm_norm:
                 print(f'failed to recover any transform')
                 exit()
@@ -240,7 +236,7 @@ class Registration:
             S_world_sfm = np.diag((s, s, s, 1)).astype(np.float32)
             Ts_norm_sfm = {}
             for model_name in self.model_names:
-                T_sfm_norm_path = output_dir / f'T~{cfg}-{model_name}_norm.npy'
+                T_sfm_norm_path = output_dir / f'T~{cfg}~{model_name}_norm.npy'
                 if T_sfm_norm_path.exists():
                     Ts_norm_sfm[model_name] = np.linalg.inv(np.load(T_sfm_norm_path))
             colors = cycle(plt.cm.tab20.colors if self.model_gt_trans else plt.cm.tab10.colors)
@@ -249,9 +245,9 @@ class Registration:
             if self.model_gt_trans:
                 vis.add_trajectory(Ts_gt_norm_world, pose_spec=0, cam_size=0.28, color=next(colors))
             for i, model_name in enumerate(self.model_names):
-                vis.add_trajectory(T_sfm_world @ np.stack([pose_sfm[1] for pose_sfm in poses_sfm[model_name]]) @ S_world_sfm, cam_size=0.3, color=next(colors))
+                vis.add_trajectory(T_sfm_world @ np.array([pose_sfm[1] for pose_sfm in poses_sfm[model_name]]) @ S_world_sfm, cam_size=0.3, color=next(colors))
                 if self.model_gt_trans:
-                    poses_norm = np.load(output_dir / f'poses-{model_name}_norm.npy')
+                    poses_norm = np.load(output_dir / f'poses~{model_name}_norm.npy')
                     vis.add_trajectory(Ts_gt_norm_world[i] @ poses_norm @ Ss_gt_world_norm[i], cam_size=0.28, color=next(colors))
             vis.show()
 

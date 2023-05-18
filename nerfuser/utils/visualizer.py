@@ -2,6 +2,7 @@ import numpy as np
 import open3d as o3d
 
 from nerfuser.utils.line_mesh import LineMesh
+from nerfuser.utils.utils import ch_pose_spec
 
 
 class Visualizer:
@@ -53,14 +54,7 @@ class Visualizer:
             if pose_type == 'w2c':
                 R = R.T
                 t = -R @ t
-            if pose_spec == 0:
-                R = R @ np.array([[1, 0, 0],
-                                  [0, 0, 1],
-                                  [0, -1, 0]])
-            elif pose_spec == 2:
-                R = R @ np.array([[1, 0, 0],
-                                  [0, -1, 0],
-                                  [0, 0, -1]])
+            R = ch_pose_spec(R, pose_spec, 1)
             cam_pts = np.vstack((t, (R @ K_invs[i] @ pts[i])[..., 0] * cam_size + t))
             cam_ls = np.array([(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (1, 3), (2, 4), (3, 4)])
             points.extend(cam_pts)
@@ -77,7 +71,7 @@ class Visualizer:
             self.o3d_vis.add_geometry(ls)
         else:
             lm = LineMesh(points, lines, colors, radius=line_width)
-            lm.add_line(self.o3d_vis)
+            self.o3d_vis.add_geometry(lm.geom)
 
     def add_point_cloud(self, pts, color=(0.5, 0, 0.5)):
         pc = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pts))
@@ -89,5 +83,4 @@ class Visualizer:
 
     def show(self):
         self.o3d_vis.run()
-        self.o3d_vis.destroy_window()
         del self.o3d_vis
