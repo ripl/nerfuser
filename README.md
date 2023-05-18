@@ -1,7 +1,5 @@
 # NeRFuser
 
-Official Code Release for NeRFuser
-
 ## Installation
 
 ### 0. Create a conda environment and activate it
