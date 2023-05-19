@@ -1,5 +1,7 @@
 # NeRFuser
 
+https://github.com/ripl/nerfuser/assets/7736732/c622b940-4e20-4a34-915a-33c2b23e1b0f
+
 ## Installation
 
 ### 0. Create a conda environment and activate it
