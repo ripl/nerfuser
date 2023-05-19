@@ -128,11 +128,5 @@ class Fuser:
             ).main()
 
 
-def entrypoint():
-    """Entrypoint for use with pyproject scripts."""
-    tyro.extras.set_accent_color('bright_yellow')
-    tyro.cli(Fuser).main()
-
-
 if __name__ == '__main__':
-    entrypoint()
+    tyro.cli(Fuser).main()

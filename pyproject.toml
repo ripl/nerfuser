@@ -10,6 +10,3 @@ dependencies=[
 
 [tool.setuptools.packages.find]
 include = ["nerfuser*"]
-
-[project.scripts]
-ns-fuse = "nerfuser.fuser:entrypoint"
