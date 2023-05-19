@@ -2,7 +2,7 @@
 
 Official code release for NeRFuser.
 
-https://github.com/ripl/nerfuser/assets/7736732/af7d61c1-f17d-4c7a-b1a3-6b5c4634d87d
+https://github.com/ripl/nerfuser/assets/7736732/0a077728-d01e-47cb-a375-0236ad374cdc
 
 ## Installation
 
