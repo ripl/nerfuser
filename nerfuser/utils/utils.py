@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import torch
 from nerfstudio.process_data.colmap_utils import qvec2rotmat
@@ -132,3 +134,11 @@ def img_cat(imgs, axis, interval=0, color=255):
     t = [gap] * (len(imgs) * 2 - 1)
     t[::2] = imgs
     return np.concatenate(t, axis=axis)
+
+
+def write2json(cam_params, poses, output_dir, name='transforms'):
+    out = {cam_param: cam_params[cam_param] for cam_param in ['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'k1', 'k2', 'p1', 'p2']}
+    out['camera_model'] = 'OPENCV'
+    out['frames'] = [{'file_path': im_name, 'transform_matrix': trans.tolist()} for im_name, trans in poses.items()]
+    with open(output_dir / f'{name}.json', 'w') as f:
+        json.dump(out, f, indent=4)

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import cycle
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,7 +25,7 @@ from nerfuser.view_renderer import ViewRenderer
 class Registration:
     """Register multiple NeRF models to a common coordinate system."""
 
-    model_dirs: List[Path]
+    model_dirs: list[Path]
     """model checkpoint directories"""
     output_dir: Path = Path('outputs/registration')
     """output directory"""
@@ -33,17 +33,17 @@ class Registration:
     """if present, will continue with the existing named experiment"""
     model_method: Literal['nerfacto'] = 'nerfacto'
     """model method"""
-    model_names: Optional[List[str]] = None
+    model_names: Optional[list[str]] = None
     """names of models to register"""
     model_gt_trans: Optional[str] = None
     """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity" """
     step: Optional[int] = None
     """model step to load"""
-    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
+    cam_info: Union[str, list[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
     """downscale factor for NeRF rendering"""
-    training_poses: Optional[List[str]] = None
+    training_poses: Optional[list[str]] = None
     """paths to training poses defined in models' local coordinate systems; if present, will be used to render training views and to determine the number of hemispheric poses"""
     n_hemi_poses: int = 30
     """number of hemispheric poses; only applicable when training-poses is not present"""

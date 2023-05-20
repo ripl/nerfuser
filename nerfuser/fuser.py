@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 import tyro
 
@@ -14,7 +14,7 @@ class Fuser:
     Fuse (i.e. register and blend) an arbitrary number of NeRFs to render novel views.
     """
 
-    model_dirs: List[Path]
+    model_dirs: list[Path]
     """model checkpoint directories"""
     enable_reg: bool = True
     """whether to enable registration"""
@@ -26,13 +26,13 @@ class Fuser:
     """if present, will continue with the existing named experiment"""
     model_method: Literal['nerfacto'] = 'nerfacto'
     """model method"""
-    model_names: Optional[List[str]] = None
+    model_names: Optional[list[str]] = None
     """names of models to fuse"""
     model_gt_trans: Optional[str] = None
     """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity" """
     step: Optional[int] = None
     """model step to load"""
-    cam_info: Union[str, List[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
+    cam_info: Union[str, list[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
     """downscale factor for NeRF rendering"""
@@ -60,13 +60,13 @@ class Fuser:
     """the coordinate system in which test-poses are defined"""
     trans_src: Literal['hemi', 'gt'] = 'hemi'
     """source of sfm to normalized nerf transforms; if "gt", will use "model-gt-trans" and test-frame must be "world" """
-    blend_methods: List[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
+    blend_methods: list[Literal['nearest', 'idw2', 'idw3', 'idw4']] = field(default_factory=lambda: ['idw4'])
     """blending methods"""
     use_global_metric: bool = False
     """whether to use global metric for measuring distances"""
     tau: Optional[float] = 2.5
     """maximum blending distance ratio; must be larger than 1; use None for infinity"""
-    gammas: List[float] = field(default_factory=lambda: [4])
+    gammas: list[float] = field(default_factory=lambda: [4])
     """blending rates for all applicable methods"""
     fps: int = 8
     """frame rate for video output"""
