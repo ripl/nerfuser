@@ -15,7 +15,7 @@ def normalized(a, axis=-1):
 class LineMesh(object):
     def __init__(self, points, lines=None, colors=(0, 0.8, 0), radius=0.05, smooth_ends=False):
         self.points = np.asarray(points)
-        self.lines = np.asarray(lines) if lines else np.array([[i, i + 1] for i in range(len(points) - 1)])
+        self.lines = np.asarray(lines) if lines else np.array([(i, i + 1) for i in range(len(points) - 1)])
         self.colors = np.asarray(colors)
         self.radius = radius
         self.smooth_ends = smooth_ends
@@ -48,18 +48,18 @@ class LineMesh(object):
 
 
 if __name__ == '__main__':
-    points = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]]
-    lines = [[0, 1], [0, 2], [1, 3], [2, 3], [4, 5], [4, 6], [5, 7], [6, 7], [0, 4], [1, 5], [2, 6], [3, 7]]
-    colors = [[1, 0, 0]] * len(lines)
+    points = ((0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 1))
+    lines = ((0, 1), (0, 2), (1, 3), (2, 3), (4, 5), (4, 6), (5, 7), (6, 7), (0, 4), (1, 5), (2, 6), (3, 7))
+    colors = ((1, 0, 0),) * len(lines)
 
     line_set = o3d.geometry.LineSet()
     line_set.points = o3d.utility.Vector3dVector(points)
     line_set.lines = o3d.utility.Vector2iVector(lines)
     line_set.colors = o3d.utility.Vector3dVector(colors)
 
-    points = np.array(points) + [0, 0, 2]
+    points = np.array(points) + (0, 0, 2)
     line_mesh1 = LineMesh(points, lines, colors, radius=0.02)
-    points = np.array(points) + [0, 2, 0]
-    line_mesh2 = LineMesh(points, colors=np.random.random(size=(len(lines) - 1, 3)), smooth_ends=True)
+    points = np.array(points) + (0, 2, 0)
+    line_mesh2 = LineMesh(points, colors=np.random.random(size=(len(points) - 1, 3)), smooth_ends=True)
 
-    o3d.visualization.draw_geometries([line_set, line_mesh1.geom, line_mesh2.geom])
+    o3d.visualization.draw_geometries((line_set, line_mesh1.geom, line_mesh2.geom))

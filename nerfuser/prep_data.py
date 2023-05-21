@@ -55,13 +55,15 @@ def main(dataset_dir: Path,
     if output_dir is None:
         output_dir = dataset_dir
     if vid_ids is None:
-        vid_ids = set(f.stem for f in dataset_dir.iterdir() if f.is_file())
+        vid_ids = {f.stem for f in dataset_dir.iterdir() if f.is_file()}
+    if vid_exts is not None:
+        vid_exts = {re.fullmatch(r'\.?(.*)', vid_ext)[1].lower() for vid_ext in vid_exts}
     assert sum((fps is None, downsample is None, n_frames is None)) >= 2, 'at most one of fps, downsample and n-frames should be specified'
 
     vids = defaultdict(set)
     for vid_id in vid_ids:
         for f in dataset_dir.iterdir():
-            if not f.stem.startswith(vid_id) or (vid_exts and f.suffix not in vid_exts):
+            if not f.stem.startswith(vid_id) or vid_exts and f.suffix.lower() not in vid_exts:
                 continue
             try:
                 assert 'nframes' in imageio.get_reader(f).get_meta_data()
@@ -74,7 +76,7 @@ def main(dataset_dir: Path,
         for vid_id in vids:
             cur_output_dir = output_dir / vid_id
             shutil.rmtree(cur_output_dir, ignore_errors=True)
-            cur_output_dir.mkdir()
+            cur_output_dir.mkdir(parents=True)
             for f in vids[vid_id]:
                 vid = imageio.get_reader(f)
                 vid_info = vid.get_meta_data()
@@ -102,19 +104,20 @@ def main(dataset_dir: Path,
                             break
 
     if run_sfm:
-        shutil.rmtree(sfm_dir, ignore_errors=True)
-        run_func = run_colmap if sfm_tool == 'colmap' else run_hloc
+        run_func = run_hloc if sfm_tool == 'hloc' else run_colmap
         if joint_sfm:
-            sfm_dir.mkdir()
+            shutil.rmtree(sfm_dir, ignore_errors=True)
+            sfm_dir.mkdir(parents=True)
             for vid_id in vids:
                 for f in (output_dir / vid_id).iterdir():
-                    (sfm_dir / f'{vid_id}_{f.name}').symlink_to(f)
+                    (sfm_dir / f'{vid_id}_{f.name}').symlink_to(f.absolute())
             run_func(sfm_dir, sfm_dir, CameraModel.OPENCV)
         else:
             for vid_id in vids:
                 cur_sfm_dir = sfm_dir / vid_id
-                cur_sfm_dir.mkdir()
-            run_func(output_dir / vid_id, cur_sfm_dir, CameraModel.OPENCV)
+                shutil.rmtree(cur_sfm_dir, ignore_errors=True)
+                cur_sfm_dir.mkdir(parents=True)
+                run_func(output_dir / vid_id, cur_sfm_dir, CameraModel.OPENCV)
 
     if write_json:
         if joint_sfm:
@@ -167,7 +170,7 @@ def main(dataset_dir: Path,
             vis = Visualizer(show_frame=True)
             colors = cycle(plt.cm.tab10.colors)
             for vid_id in vids:
-                with open(output_dir / vid_id / 'transforms.json') as f:
+                with (output_dir / vid_id / 'transforms.json').open() as f:
                     transforms = json.load(f)
                 poses = np.array([frame['transform_matrix'] for frame in transforms['frames']], dtype=np.float32)
                 vis.add_trajectory(poses, cam_size=0.1, color=next(colors))
@@ -175,7 +178,7 @@ def main(dataset_dir: Path,
         else:
             for vid_id in vids:
                 vis = Visualizer(show_frame=True)
-                with open(output_dir / vid_id / 'transforms.json') as f:
+                with (output_dir / vid_id / 'transforms.json').open() as f:
                     transforms = json.load(f)
                 poses = np.array([frame['transform_matrix'] for frame in transforms['frames']], dtype=np.float32)
                 vis.add_trajectory(poses, cam_size=0.1, color=(0, 0.8, 0))

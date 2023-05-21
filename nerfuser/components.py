@@ -55,16 +55,12 @@ class WeightedRGBRenderer(RGBRenderer):
         Returns:
             Rendered RGB values.
         """
-
         comp_rgb = torch.sum(rgb * ws, dim=-2)
-
         if self.background_color == 'last_sample':
             background_color = rgb[..., -1, :]
         elif self.background_color == 'random':
             background_color = torch.rand_like(comp_rgb)
         else:
             background_color = self.background_color
-
         comp_rgb += background_color * bg_w
-
         return comp_rgb

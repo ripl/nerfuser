@@ -1,4 +1,3 @@
-import os
 import shutil
 from collections import defaultdict
 from types import MethodType
@@ -28,7 +27,7 @@ class ViewBlender:
         for load_dir in load_dirs:
             if load_step is None or not (load_path := load_dir / f'step-{load_step:09d}.ckpt').exists():
                 # load the latest checkpoint
-                load_path = load_dir / max(os.listdir(load_dir))
+                load_path = max(load_dir.iterdir())
             state = torch.load(load_path, map_location=device)
             state = {key[7:]: val for key, val in state['pipeline'].items() if key.startswith('_model.')}
             if model_method == 'nerfacto':
@@ -59,11 +58,11 @@ class ViewBlender:
         """
         for method in methods:
             shutil.rmtree(output_dir / method, ignore_errors=True)
-            os.makedirs(output_dir / method)
+            (output_dir / method).mkdir(parents=True)
         if save_extras:
             for model_name in self.model_names:
                 shutil.rmtree(output_dir / model_name, ignore_errors=True)
-                os.makedirs(output_dir / model_name)
+                (output_dir / model_name).mkdir(parents=True)
         c2ws = complete_trans(torch.as_tensor(c2ws, device=self.device))
         for p in cam_info:
             if isinstance(cam_info[p], np.ndarray):
@@ -136,7 +135,7 @@ class ViewBlender:
     def blend(self, method, g, data, c2w_ts, scales, save_extras, keep_flags):
         n_models = len(keep_flags)
         n_keeps, n_rays = data['weights'].shape[:2]
-        if method in ['nearest', 'idw2']:
+        if method in {'nearest', 'idw2'}:
             if method == 'nearest':
                 g = torch.inf
             dists = torch.linalg.norm(c2w_ts, dim=-1)
@@ -170,7 +169,7 @@ class ViewBlender:
             w_bg = ws[..., [-1]] if bg == 'last_sample' else torch.full((n_keeps, n_rays, 1), 1 / n_keeps, device=ws.device)
             cs = merged_weights * ws[..., None]
             c_bg = (1 - data['accumulation']) * w_bg
-            s = torch.cat([cs, c_bg[..., None, :]], dim=-2).sum(dim=[0, -2], keepdim=True)
+            s = torch.cat([cs, c_bg[..., None, :]], dim=-2).sum(dim=(0, -2), keepdim=True)
             c = 1 / (cs.shape[0] * (cs.shape[-2] + 1))
             cs = torch.nan_to_num(cs / s, nan=c)
             c_bg = torch.nan_to_num(c_bg / s.squeeze(-2), nan=c)
@@ -183,7 +182,7 @@ class ViewBlender:
 
     @staticmethod
     def idw(dists, g):
-        """ dists: [n_dists, ...] """
+        """ dists: (n_dists, ...) """
         t = (dists.unsqueeze(1) / dists).nan_to_num(nan=1)
         return 1 / (t**g).sum(dim=1)
 
@@ -200,17 +199,17 @@ class ViewBlender:
 
         device = weights.device
         n_models, n_rays, n_samples = weights.shape[:3]
-        merged_weights = torch.empty((n_models, n_rays, n_samples * n_models, 1), device=device)
-        merged_rgbs = torch.empty((n_models, n_rays, n_samples * n_models, 3), device=device)
-        merged_ends = torch.empty((n_rays, n_samples * n_models, 1), device=device)
+        merged_weights = torch.empty(n_models, n_rays, n_samples * n_models, 1, device=device)
+        merged_rgbs = torch.empty(n_models, n_rays, n_samples * n_models, 3, device=device)
+        merged_ends = torch.empty(n_rays, n_samples * n_models, 1, device=device)
 
-        weights = torch.cat((weights, torch.zeros((n_models, n_rays, 1, 1), device=device)), dim=-2)
-        rgbs = torch.cat((rgbs, torch.zeros((n_models, n_rays, 1, 3), device=device)), dim=-2)
+        weights = torch.cat((weights, torch.zeros(n_models, n_rays, 1, 1, device=device)), dim=-2)
+        rgbs = torch.cat((rgbs, torch.zeros(n_models, n_rays, 1, 3, device=device)), dim=-2)
         deltas = torch.cat((deltas, torch.full((n_models, n_rays, 1, 1), torch.inf, device=device)), dim=-2)
         scales = scales[:, None, None, None]
         deltas *= scales
         ends = torch.cumsum(deltas, dim=-2)
-        ps = torch.zeros((n_models, n_rays, 1, 1), dtype=int, device=device)
+        ps = torch.zeros(n_models, n_rays, 1, 1, dtype=int, device=device)
         for i in range(n_samples * n_models):
             end = ends.gather(-2, ps)
             end_min, model_id = torch.min(end, 0, keepdim=True)

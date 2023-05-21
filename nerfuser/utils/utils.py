@@ -12,15 +12,15 @@ def ch_pose_spec(T, src, tgt, pose_type='c2w'):
             1: x->right, y->down, z->front
             2: x->right, y->up, z->back """
     # x-to-0 transforms
-    Ts = np.array([np.identity(4),
-                   [[1, 0, 0, 0],
-                    [0, 0, 1, 0],
-                    [0, -1, 0, 0],
-                    [0, 0, 0, 1]],
-                   [[1, 0, 0, 0],
-                    [0, 0, -1, 0],
-                    [0, 1, 0, 0],
-                    [0, 0, 0, 1]]], dtype=T.dtype)
+    Ts = np.array((np.identity(4),
+                   ((1, 0, 0, 0),
+                    (0, 0, 1, 0),
+                    (0, -1, 0, 0),
+                    (0, 0, 0, 1)),
+                   ((1, 0, 0, 0),
+                    (0, 0, -1, 0),
+                    (0, 1, 0, 0),
+                    (0, 0, 0, 1))), dtype=T.dtype)
     s = T.shape[-2:]
     T = complete_trans(T)
     return (T @ np.linalg.inv(Ts[src]) @ Ts[tgt] if pose_type == 'c2w' else np.linalg.inv(Ts[tgt]) @ Ts[src] @ T)[..., :s[0], :s[1]]
@@ -38,13 +38,13 @@ def gen_lookat_pose(c, t, u=None, pose_spec=2, pose_type='c2w'):
         we assume world frame spec is 0
         pose_type: one of {'c2w', 'w2c'} """
     if u is None:
-        u = np.array([0, 0, 1])
+        u = np.array((0, 0, 1))
     y = t - c
     y = y / np.linalg.norm(y)
     x = np.cross(y, u)
     x = x / np.linalg.norm(x)
     z = np.cross(x, y)
-    R = ch_pose_spec(np.array([x, y, z]).T, 0, pose_spec)
+    R = ch_pose_spec(np.array((x, y, z)).T, 0, pose_spec)
     if pose_type == 'w2c':
         R = R.T
         c = -R @ c
@@ -60,7 +60,7 @@ def gen_elliptical_poses(a, b, theta, h, target=np.zeros(3), n=10, pose_spec=2):
         x = x0 * np.cos(theta) - y0 * np.sin(theta)
         y = y0 * np.cos(theta) + x0 * np.sin(theta)
         z = h
-        poses.append(gen_lookat_pose(np.array([x, y, z]), target, pose_spec=pose_spec))
+        poses.append(gen_lookat_pose(np.array((x, y, z)), target, pose_spec=pose_spec))
     return poses
 
 
@@ -80,7 +80,7 @@ def gen_hemispheric_poses(r, gamma_lo, gamma_hi=None, target=np.zeros(3), m=3, n
 
 
 def complete_trans(T):
-    """ completes T to be [..., 4, 4] """
+    """ completes T to be (..., 4, 4) """
     s = T.shape
     if s[-2:] == (4, 4):
         return T
@@ -91,7 +91,7 @@ def complete_trans(T):
 
 
 def decompose_sim3(T):
-    """ T: [..., 4, 4] """
+    """ T: (..., 4, 4) """
     if isinstance(T, np.ndarray):
         G = T.copy()
         s = np.linalg.det(G[..., :3, :3])**(1 / 3)
@@ -128,7 +128,7 @@ def extract_colmap_pose(colmap_im):
 
 
 def img_cat(imgs, axis, interval=0, color=255):
-    assert axis in [0, 1], 'axis must be either 0 or 1'
+    assert axis in {0, 1}, 'axis must be either 0 or 1'
     h, w, c = imgs[0].shape
     gap = np.broadcast_to(color, (h, interval, c) if axis else (interval, w, c)).astype(imgs[0].dtype)
     t = [gap] * (len(imgs) * 2 - 1)
@@ -137,8 +137,8 @@ def img_cat(imgs, axis, interval=0, color=255):
 
 
 def write2json(cam_params, poses, output_dir, name='transforms'):
-    out = {cam_param: cam_params[cam_param] for cam_param in ['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'k1', 'k2', 'p1', 'p2']}
+    out = {cam_param: cam_params[cam_param] for cam_param in ('fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'k1', 'k2', 'p1', 'p2')}
     out['camera_model'] = 'OPENCV'
     out['frames'] = [{'file_path': im_name, 'transform_matrix': trans.tolist()} for im_name, trans in poses.items()]
-    with open(output_dir / f'{name}.json', 'w') as f:
+    with (output_dir / f'{name}.json').open(mode='w') as f:
         json.dump(out, f, indent=4)

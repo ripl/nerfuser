@@ -30,9 +30,9 @@ class Visualizer:
             Rs, ts = poses
         n_cams = len(Rs)
         if K_invs is None:
-            K_invs = np.linalg.inv(np.array([[1000, 0, 400],
-                                             [0, 1000, 300],
-                                             [0, 0, 1]]))
+            K_invs = np.linalg.inv(np.array(((1000, 0, 400),
+                                             (0, 1000, 300),
+                                             (0, 0, 1))))
             ws = 800
             hs = 600
         if np.ndim(K_invs) == 2:
@@ -56,21 +56,18 @@ class Visualizer:
                 t = -R @ t
             R = ch_pose_spec(R, pose_spec, 1)
             cam_pts = np.vstack((t, (R @ K_invs[i] @ pts[i])[..., 0] * cam_size + t))
-            cam_ls = np.array([(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (1, 3), (2, 4), (3, 4)])
+            cam_ls = np.array(((0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (1, 3), (2, 4), (3, 4)))
             points.extend(cam_pts)
             if connect_cams and len(lines):
-                cam_ls = np.vstack((cam_ls, [-5, 0]))
+                cam_ls = np.vstack((cam_ls, (-5, 0)))
             lines.extend(i * 5 + cam_ls)
-            colors.extend([color[i] for _ in range(len(cam_ls))])
+            colors.extend((color[i],) * len(cam_ls))
         if line_width is None:
-            ls = o3d.geometry.LineSet(
-                points=o3d.utility.Vector3dVector(points),
-                lines=o3d.utility.Vector2iVector(lines),
-            )
+            ls = o3d.geometry.LineSet(points=o3d.utility.Vector3dVector(points), lines=o3d.utility.Vector2iVector(lines))
             ls.colors = o3d.utility.Vector3dVector(colors)
             self.o3d_vis.add_geometry(ls)
         else:
-            lm = LineMesh(points, lines, colors, radius=line_width)
+            lm = LineMesh(points, lines, colors, radius=line_width / 2)
             self.o3d_vis.add_geometry(lm.geom)
 
     def add_point_cloud(self, pts, color=(0.5, 0, 0.5)):

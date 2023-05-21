@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import shutil
 from collections import defaultdict
@@ -35,16 +34,16 @@ class Registration:
     """model method"""
     model_names: Optional[list[str]] = None
     """names of models to register"""
-    model_gt_trans: Optional[str] = None
+    model_gt_trans: Optional[Path] = None
     """path to npy containing ground-truth transforms from the common world coordinate system to each model's local one; can be "identity" """
     step: Optional[int] = None
     """model step to load"""
-    cam_info: Union[str, list[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
+    cam_info: Union[Path, list[float]] = field(default_factory=lambda: [400.0, 400.0, 400.0, 300.0, 800, 600])
     """either path to json or cam params (fx fy cx cy w h)"""
     downscale_factor: Optional[float] = None
     """downscale factor for NeRF rendering"""
-    training_poses: Optional[list[str]] = None
-    """paths to training poses defined in models' local coordinate systems; if present, will be used to render training views and to determine the number of hemispheric poses"""
+    training_poses: Optional[list[Path]] = None
+    """paths to json containing training poses; if present, will be used to render training views and to determine the number of hemispheric poses"""
     n_hemi_poses: int = 30
     """number of hemispheric poses; only applicable when training-poses is not present"""
     render_hemi_views: bool = False
@@ -74,7 +73,7 @@ class Registration:
         if not self.name:
             self.name = datetime.now().strftime('%m.%d_%H:%M:%S')
         output_dir = self.output_dir / self.name
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
         n_models = len(self.model_dirs)
         if not self.model_names:
             self.model_names = [f'nerf{i}' for i in range(n_models)]
@@ -85,15 +84,23 @@ class Registration:
         else:
             cfg = 'train' if self.training_poses else 'hemi'
         sfm_dir = output_dir / f'{self.sfm_tool}~{cfg}'
-        log_dict = {attr: dict(zip(self.model_names, [str(model_dir) for model_dir in self.model_dirs])) if attr == 'model_dirs' else getattr(self, attr) for attr in ['model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'sfm_tool']}
-        with open(output_dir / f'{cfg}.json', 'w') as f:
+        log_dict = {}
+        for attr in ('model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'sfm_tool'):
+            val = getattr(self, attr)
+            if attr in {'model_dirs', 'training_poses'}:
+                if val:
+                    val = dict(zip(self.model_names, [str(item) for item in val]))
+            elif isinstance(val, Path):
+                val = str(val)
+            log_dict[attr] = val
+        with (output_dir / f'{cfg}.json').open(mode='w') as f:
             json.dump(log_dict, f, indent=2)
 
         # nerf-to-nerf_norm transforms
         Ts_nerf_norm = []
         Ss_norm_nerf = []
         for model_dir in self.model_dirs:
-            with open(model_dir.parent / 'dataparser_transforms.json') as f:
+            with (model_dir.parent / 'dataparser_transforms.json').open() as f:
                 transforms = json.load(f)
             s = transforms['scale']
             S_nerf_norm = np.diag((s, s, s, 1)).astype(np.float32)
@@ -103,7 +110,7 @@ class Registration:
         Ss_norm_nerf = np.array(Ss_norm_nerf)
         if self.model_gt_trans:
             # gt world-to-nerf transforms
-            Ts_gt_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32), (n_models, 4, 4)) if self.model_gt_trans.lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
+            Ts_gt_world_nerf = np.broadcast_to(np.identity(4, dtype=np.float32), (n_models, 4, 4)) if str(self.model_gt_trans).lower() in {'i', 'identity'} else np.load(self.model_gt_trans)
             # gt world-to-nerf_norm transforms
             Ts_gt_world_norm = Ts_nerf_norm @ Ts_gt_world_nerf
             Ts_gt_norm_world = np.linalg.inv(Ts_gt_world_norm)
@@ -116,7 +123,7 @@ class Registration:
             frames = []
             ls = []
             for training_pose in self.training_poses:
-                with open(training_pose) as f:
+                with training_pose.open() as f:
                     transforms = json.load(f)
                 frames.append(transforms['frames'])
                 ls.append(len(frames[-1]))
@@ -131,30 +138,30 @@ class Registration:
         rng = np.random.default_rng(0)
 
         if self.render_views:
-            if isinstance(self.cam_info, str):
-                with open(self.cam_info) as f:
+            if isinstance(self.cam_info, Path):
+                with self.cam_info.open() as f:
                     transforms = json.load(f)
-                cam_info = {'fx': transforms['fl_x'], 'fy': transforms['fl_y'], 'cx': transforms['cx'], 'cy': transforms['cy'], 'width': transforms['w'], 'height': transforms['h'], 'distortion_params': np.array([transforms['k1'], transforms['k2'], 0, 0, transforms['p1'], transforms['p2']], dtype=np.float32)}
+                cam_info = {'fx': transforms['fl_x'], 'fy': transforms['fl_y'], 'cx': transforms['cx'], 'cy': transforms['cy'], 'width': transforms['w'], 'height': transforms['h'], 'distortion_params': np.array((transforms['k1'], transforms['k2'], 0, 0, transforms['p1'], transforms['p2']), dtype=np.float32)}
             else:
-                cam_info = dict(zip(['fx', 'fy', 'cx', 'cy', 'width', 'height'], self.cam_info))
+                cam_info = dict(zip(('fx', 'fy', 'cx', 'cy', 'width', 'height'), self.cam_info))
             if self.downscale_factor:
                 for pname in cam_info:
                     if pname != 'distortion_params':
                         cam_info[pname] /= self.downscale_factor
             cam_info['height'] = int(cam_info['height'])
             cam_info['width'] = int(cam_info['width'])
-            for i, model_dir in enumerate(self.model_dirs):
+            for i in range(n_models):
                 poses_norm = complete_trans(np.array(gen_hemispheric_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
                 if self.training_poses:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
                     poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.array([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
                 with torch.no_grad():
-                    ViewRenderer(self.model_method, self.model_names[i], model_dir, load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
+                    ViewRenderer(self.model_method, self.model_names[i], self.model_dirs[i], load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
                 np.save(output_dir / f'poses~{self.model_names[i]}_norm.npy', poses_norm)
 
         if self.run_sfm:
             shutil.rmtree(sfm_dir, ignore_errors=True)
-            os.makedirs(sfm_dir)
+            sfm_dir.mkdir(parents=True)
             # uses hemi views, maybe training views
             c1 = not self.training_poses or self.render_hemi_views
             # uses hemi + training views
@@ -162,14 +169,13 @@ class Registration:
             # uses training views only
             c3 = self.training_poses and not self.render_hemi_views
             for i, model_name in enumerate(self.model_names):
-                files = os.listdir(output_dir / model_name)
                 if c1:
                     ids = set(rng.permutation(ks[i])[:np.floor(ls[i] * self.sfm_w_hemi_views).astype(int)])
-                for f in files:
-                    id = int(f.split('.')[0])
+                for f in (output_dir / model_name).iterdir():
+                    id = int(f.stem)
                     if c1 and id in ids or c2 and id >= ks[i] or c3:
-                        os.symlink((output_dir / model_name / f).absolute(), sfm_dir / f'{model_name}_{f}')
-            run_func = run_colmap if self.sfm_tool == 'colmap' else run_hloc
+                        (sfm_dir / f'{model_name}_{f.name}').symlink_to(f.absolute())
+            run_func = run_hloc if self.sfm_tool == 'hloc' else run_colmap
             run_func(sfm_dir, sfm_dir, CameraModel.OPENCV)
 
         if self.compute_trans or self.vis:

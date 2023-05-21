@@ -43,10 +43,10 @@ pip install .
 
 ## Data Preparation
 
-The data preparation assumes that you have several `MOV` videos focusing on different yet overlapping portions of the same scene. One of the videos should be named `test.MOV`, from which we will extract images for blending evaluation. Others can be named whatever you like. Assume you collected 3 more videos besides `test.MOV`, whose names w/o the `MOV` extension are stored as `A`, `B` and `C`. First put all the video files in the directory `DATASET_DIR`, then run the following command to prepare data from the videos:
+The data preparation assumes that you have several videos focusing on different yet overlapping portions of the same scene. Assuming the video file extension is `ext` (e.g. mp4, mov, etc.), one of the videos should be named `test.ext`, from which we will extract images for blending evaluation. Others can be named whatever you like. Assume you collected 3 more videos besides `test.ext`, whose names w/o the `ext` extension are stored as `A`, `B` and `C`. First put all the video files in the directory `DATASET_DIR`, then run the following command to prepare data from the videos:
 
 ```bash
-python prep_data.py \
+python -m nerfuser.prep_data \
     --dataset-dir $DATASET_DIR \
     --vid-ids test $A $B $C \
     --downsample 8 \
@@ -56,7 +56,7 @@ python prep_data.py \
     --vis
 ```
 
-Please look further into `prep_data.py` for more options. A sample dataset is provided [here](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main).
+Please run `python -m nerfuser.prep_data -h` for more details. A sample dataset is provided [here](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main).
 
 ## Training NeRFs
 
