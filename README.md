@@ -43,7 +43,7 @@ pip install .
 
 ## Data Preparation
 
-The data preparation assumes that you have several videos focusing on different yet overlapping portions of the same scene. Assuming the video file extension is `ext` (e.g. mp4, mov, etc.), one of the videos should be named `test.ext`, from which we will extract images for blending evaluation. Others can be named whatever you like. Assume you collected 3 more videos besides `test.ext`, whose names w/o the `ext` extension are stored as `A`, `B` and `C`. First put all the video files in the directory `DATASET_DIR`, then run the following command to prepare data from the videos:
+The data preparation assumes that you have several videos focusing on different yet overlapping portions of the same scene. Let `ext` denote the video file extension (e.g. `mp4`, `mov`, etc.), then one of the videos should be named `test.ext`, from which images will be extracted for blending evaluation. Others can be named whatever you like. Assume you have collected 3 more videos besides `test.ext`, whose names w/o the `ext` extension are stored as `A`, `B` and `C`. First put all the video files (including `test.ext`) in the directory `DATASET_DIR`, then run the following command to prepare data for training NeRFs:
 
 ```bash
 python -m nerfuser.prep_data \
@@ -56,11 +56,11 @@ python -m nerfuser.prep_data \
     --vis
 ```
 
-Please run `python -m nerfuser.prep_data -h` for more details. A sample dataset is provided [here](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main).
+Please run `python -m nerfuser.prep_data -h` for more details. A sample dataset containing both videos and prepared data is provided [here](https://huggingface.co/datasets/RIPL/TTIC-common).
 
 ## Training NeRFs
 
-Let `MODELS_DIR` be the directory where you want to save the trained NeRF models. Run the following command to train a NeRF model for each video other than `test`:
+Let `MODELS_DIR` be the directory where you want to save the trained NeRF models. Run the following command to train a NeRF model corresponding to each video other than `test`:
 
 ```bash
 for VID in $A $B $C; do
@@ -71,6 +71,8 @@ for VID in $A $B $C; do
         --pipeline.datamanager.camera-optimizer.mode off
 done
 ```
+
+Please run `ns-train nerfacto -h` for more details. Trained NeRF models on the [sample dataset](https://huggingface.co/datasets/RIPL/TTIC-common) are provided [here](https://huggingface.co/RIPL/TTIC-common).
 
 ## NeRF Registration
 

@@ -119,7 +119,10 @@ class ViewBlender:
                         ws_chunks[method].append(val[1].cpu())
             if save_extras:
                 for model_name in self.model_names:
-                    imageio.v3.imwrite(output_dir / model_name / f'{i:04d}.png', (torch.cat(rgb_chunks[model_name]).view(h, w, -1) * 255).to(torch.uint8).numpy())
+                    img = (torch.cat(rgb_chunks[model_name]).view(h, w, -1) * 255).to(torch.uint8).numpy()
+                    imageio.v3.imwrite(output_dir / model_name / f'{i:04d}.png', img)
+                    if animate:
+                        imgs[model_name].append(img)
             for method in methods:
                 img = (torch.cat(rgb_chunks[method]).view(h, w, -1) * 255).to(torch.uint8).numpy()
                 imageio.v3.imwrite(output_dir / method / f'{i:04d}.png', img)
@@ -129,6 +132,9 @@ class ViewBlender:
                 if animate:
                     imgs[method].append(img)
         if animate:
+            if save_extras:
+                for model_name in self.model_names:
+                    imageio.v3.imwrite(output_dir / f'{model_name}.mp4', imgs[model_name], fps=animate, quality=10)
             for method in methods:
                 imageio.v3.imwrite(output_dir / f'{method}.mp4', imgs[method], fps=animate, quality=10)
 

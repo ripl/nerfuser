@@ -85,7 +85,7 @@ def main(dataset_dir: Path,
                 vid_n_frames = round(vid_fps * vid_duration)
                 if demo and vid_id == 'test':
                     img_ids = np.arange(vid_n_frames)
-                if fps is not None:
+                elif fps is not None:
                     img_ids = np.linspace(0, vid_n_frames - 1, num=round(min(fps, vid_fps) * vid_duration)).round().astype(int)
                 elif downsample is not None:
                     img_ids = np.arange(vid_n_frames, step=max(downsample, 1))
