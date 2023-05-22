@@ -4,77 +4,39 @@ Official code release for NeRFuser.
 
 <image width="100%" src="assets/teaser.svg">
 
-<style>
-    .column3 {
-        float: left;
-        width: 33%;
-        text-align: center;
-        padding: 0.15%;
-    }
-    .column2 {
-        float: left;
-        width: 49%;
-        text-align: center;
-        padding: 0.5%;
-    }
-</style>
-
 ## Original Videos
 
-<div class="column3">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/A.MOV">
-    </video>
-    <p><b>A</b></p>
-</div>
-<div class="column3">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/B.MOV">
-    </video>
-    <p><b>B</b></p>
-</div>
-<div class="column3">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/C.MOV">
-    </video>
-    <p><b>C</b></p>
-</div>
+<video width="33%" autoplay controls loop muted>
+    <source src="assets/A.MOV">
+</video>
+<video width="33%" autoplay controls loop muted>
+    <source src="assets/B.MOV">
+</video>
+<video width="33%" autoplay controls loop muted>
+    <source src="assets/C.MOV">
+</video>
 
 ## Raw NeRFs
 
-<div class="column3">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/nerfA.mp4">
-    </video>
-    <p><b>A</b></p>
-</div>
-<div class="column3">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/nerfB.mp4">
-    </video>
-    <p><b>B</b></p>
-</div>
-<div class="column3">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/nerfC.mp4">
-    </video>
-    <p><b>C</b></p>
+<video width="33%" autoplay controls loop muted>
+    <source src="assets/nerfA.mp4">
+</video>
+<video width="33%" autoplay controls loop muted>
+    <source src="assets/nerfB.mp4">
+</video>
+<video width="33%" autoplay controls loop muted>
+    <source src="assets/nerfC.mp4">
+</video>
 </div>
 
 ## NeRFuser vs. Ground-Truth
 
-<div class="column2">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/nerfuser.mp4">
-    </video>
-    <p><b>NeRFuser</b></p>
-</div>
-<div class="column2">
-    <video width="100%" autoplay controls loop muted>
-        <source src="assets/groundtruth.MOV">
-    </video>
-    <p><b>Ground-Truth</b></p>
-</div>
+<video width="48%" autoplay controls loop muted>
+    <source src="assets/nerfuser.mp4">
+</video>
+<video width="48%" autoplay controls loop muted>
+    <source src="assets/groundtruth.MOV">
+</video>
 
 ## Installation
 
