@@ -1,4 +1,6 @@
 .vscode/
+*.MOV
+*.mp4
 playground*
 
 # Byte-compiled / optimized / DLL files

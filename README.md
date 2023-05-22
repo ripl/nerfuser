@@ -6,37 +6,20 @@ Official code release for NeRFuser.
 
 ## Original Videos
 
-<video width="33%" autoplay controls loop muted>
-    <source src="assets/A.MOV">
-</video>
-<video width="33%" autoplay controls loop muted>
-    <source src="assets/B.MOV">
-</video>
-<video width="33%" autoplay controls loop muted>
-    <source src="assets/C.MOV">
-</video>
+<image width="33%" src="assets/A.gif">
+<image width="33%" src="assets/B.gif">
+<image width="33%" src="assets/C.gif">
 
 ## Raw NeRFs
 
-<video width="33%" autoplay controls loop muted>
-    <source src="assets/nerfA.mp4">
-</video>
-<video width="33%" autoplay controls loop muted>
-    <source src="assets/nerfB.mp4">
-</video>
-<video width="33%" autoplay controls loop muted>
-    <source src="assets/nerfC.mp4">
-</video>
-</div>
+<image width="33%" src="assets/nerfA.gif">
+<image width="33%" src="assets/nerfB.gif">
+<image width="33%" src="assets/nerfC.gif">
 
 ## NeRFuser vs. Ground-Truth
 
-<video width="48%" autoplay controls loop muted>
-    <source src="assets/nerfuser.mp4">
-</video>
-<video width="48%" autoplay controls loop muted>
-    <source src="assets/groundtruth.MOV">
-</video>
+<image width="49%" src="assets/nerfuser.gif">
+<image width="49%" src="assets/groundtruth.gif">
 
 ## Installation
 

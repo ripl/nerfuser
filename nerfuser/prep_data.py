@@ -18,21 +18,23 @@ from nerfuser.utils.utils import extract_colmap_pose, write2json
 from nerfuser.utils.visualizer import Visualizer
 
 
-def main(dataset_dir: Path,
-         output_dir: Optional[Path] = None,
-         vid_ids: Optional[set[str]] = None,
-         vid_exts: Optional[set[str]] = None,
-         fps: Optional[float] = None,
-         downsample: Optional[int] = None,
-         n_frames: Optional[int] = None,
-         demo: bool = False,
-         flip: bool = False,
-         sfm_tool: Literal['hloc', 'colmap'] = 'hloc',
-         joint_sfm: bool = True,
-         extract_images: bool = False,
-         run_sfm: bool = False,
-         write_json: bool = False,
-         vis: bool = False):
+def main(
+    dataset_dir: Path,
+    output_dir: Optional[Path] = None,
+    vid_ids: Optional[set[str]] = None,
+    vid_exts: Optional[set[str]] = None,
+    fps: Optional[float] = None,
+    downsample: Optional[int] = None,
+    n_frames: Optional[int] = None,
+    demo: bool = False,
+    flip: bool = False,
+    sfm_tool: Literal['hloc', 'colmap'] = 'hloc',
+    joint_sfm: bool = True,
+    extract_images: bool = False,
+    run_sfm: bool = False,
+    write_json: bool = False,
+    vis: bool = False,
+):
     """prepare datasets of posed-RGB images from videos
 
     Args:
@@ -57,7 +59,7 @@ def main(dataset_dir: Path,
     if vid_ids is None:
         vid_ids = {f.stem for f in dataset_dir.iterdir() if f.is_file()}
     if vid_exts is not None:
-        vid_exts = {re.fullmatch(r'\.?(.*)', vid_ext)[1].lower() for vid_ext in vid_exts}
+        vid_exts = {'.' + re.fullmatch(r'\.?(.*)', vid_ext)[1].lower() for vid_ext in vid_exts}
     assert sum((fps is None, downsample is None, n_frames is None)) >= 2, 'at most one of fps, downsample and n-frames should be specified'
 
     vids = defaultdict(set)
