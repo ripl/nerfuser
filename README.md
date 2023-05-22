@@ -74,7 +74,7 @@ python -m nerfuser.prep_data \
     --vis
 ```
 
-Please run `python -m nerfuser.prep_data -h` for more details. A sample dataset containing both videos and prepared data is provided [here](https://huggingface.co/datasets/RIPL/TTIC-common).
+Please run `python -m nerfuser.prep_data -h` for more details. A sample dataset containing both videos and prepared data is provided [here](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main).
 
 ## Training NeRFs
 
@@ -90,7 +90,7 @@ for VID in $A $B $C; do
 done
 ```
 
-Please run `ns-train nerfacto -h` for more details. Trained NeRF models on the [sample dataset](https://huggingface.co/datasets/RIPL/TTIC-common) are provided [here](https://huggingface.co/RIPL/TTIC-common).
+Please run `ns-train nerfacto -h` for more details. Trained NeRF models on the [sample dataset](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main) are provided [here](https://huggingface.co/RIPL/TTIC-common/tree/main).
 
 ## NeRF Registration
 
