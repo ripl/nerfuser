@@ -56,7 +56,7 @@ class Blending:
     """blending methods"""
     use_global_metric: bool = False
     """whether to use global metric for measuring distances"""
-    tau: Optional[float] = 2.5
+    tau: Optional[float] = None
     """maximum blending distance ratio; must be larger than 1; use None for infinity"""
     gammas: set[float] = field(default_factory=lambda: {4})
     """blending rates for all applicable methods"""
