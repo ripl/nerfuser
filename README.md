@@ -7,13 +7,13 @@ Official code release for NeRFuser.
 ### Original Videos
 
 <p align="center">
-    <image width="33%" src="assets/A.gif"> <image width="33%" src="assets/B.gif"> <image width="33%" src="assets/C.gif">
+    <image width="32%" src="assets/A.gif"> <image width="32%" src="assets/B.gif"> <image width="32%" src="assets/C.gif">
 </p>
 
 ### Raw NeRFs
 
 <p align="center">
-    <image width="33%" src="assets/nerfA.gif"> <image width="33%" src="assets/nerfB.gif"> <image width="33%" src="assets/nerfC.gif">
+    <image width="32%" src="assets/nerfA.gif"> <image width="32%" src="assets/nerfB.gif"> <image width="32%" src="assets/nerfC.gif">
 </p>
 
 ### __NeRFuser Result__
