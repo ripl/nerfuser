@@ -6,15 +6,15 @@ Official code release for NeRFuser.
 
 ## Original Videos
 
-<image width="32%" src="assets/A.gif"> <image width="32%" src="assets/B.gif"> <image width="32%" src="assets/C.gif">
+<image width="32%" src="assets/A.gif" loop=infinite> <image width="32%" src="assets/B.gif" loop=infinite> <image width="32%" src="assets/C.gif" loop=infinite>
 
 ## Raw NeRFs
 
-<image width="32%" src="assets/nerfA.gif"> <image width="32%" src="assets/nerfB.gif"> <image width="32%" src="assets/nerfC.gif">
+<image width="32%" src="assets/nerfA.gif" loop=infinite> <image width="32%" src="assets/nerfB.gif" loop=infinite> <image width="32%" src="assets/nerfC.gif" loop=infinite>
 
 ## NeRFuser vs. Ground-Truth
 
-<image width="48%" src="assets/nerfuser.gif"> <image width="48%" src="assets/groundtruth.gif">
+<image width="48%" src="assets/nerfuser.gif" loop=infinite> <image width="48%" src="assets/groundtruth.gif" loop=infinite>
 
 ## Installation
 
