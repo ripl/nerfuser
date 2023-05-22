@@ -16,7 +16,7 @@ Official code release for NeRFuser.
     <image width="32%" src="assets/nerfA.gif"> <image width="32%" src="assets/nerfB.gif"> <image width="32%" src="assets/nerfC.gif">
 </p>
 
-### __NeRFuser Result__
+### *NeRFuser Result*
 
 <p align="center">
     <image width="60%" src="assets/nerfuser.gif">
