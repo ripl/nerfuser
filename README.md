@@ -2,24 +2,29 @@
 
 Official code release for NeRFuser.
 
-<image width="100%" src="assets/teaser.svg">
+<image src="assets/teaser.svg">
 
-## Original Videos
+### Original Videos
 
-<image width="33%" src="assets/A.gif">
-<image width="33%" src="assets/B.gif">
-<image width="33%" src="assets/C.gif">
+<p align="center">
+    <image width="33%" src="assets/A.gif">
+    <image width="33%" src="assets/B.gif">
+    <image width="33%" src="assets/C.gif">
+</p>
 
-## Raw NeRFs
+### Raw NeRFs
 
-<image width="33%" src="assets/nerfA.gif">
-<image width="33%" src="assets/nerfB.gif">
-<image width="33%" src="assets/nerfC.gif">
+<p align="center">
+    <image width="33%" src="assets/nerfA.gif">
+    <image width="33%" src="assets/nerfB.gif">
+    <image width="33%" src="assets/nerfC.gif">
+</p>
 
-## NeRFuser vs. Ground-Truth
+### __NeRFuser Result__
 
-<image width="49%" src="assets/nerfuser.gif">
-<image width="49%" src="assets/groundtruth.gif">
+<p align="center">
+    <image width="60%" src="assets/nerfuser.gif">
+</p>
 
 ## Installation
 
