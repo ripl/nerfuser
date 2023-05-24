@@ -28,6 +28,7 @@ class ViewBlender:
             if load_step is None or not (load_path := load_dir / f'step-{load_step:09d}.ckpt').exists():
                 # load the latest checkpoint
                 load_path = max(load_dir.iterdir())
+                load_step = int(load_path.stem[5:])
             state = torch.load(load_path, map_location=device)
             state = {key[7:]: val for key, val in state['pipeline'].items() if key.startswith('_model.')}
             if model_method == 'nerfacto':
@@ -35,6 +36,7 @@ class ViewBlender:
                 model.get_outputs = MethodType(get_nerfacto_outputs, model)
                 if not chunk_size:
                     chunk_size = 1 << 16
+            model.update_to_step(load_step)
             model.load_state_dict(state)
             model.eval()
             self.models.append(model)

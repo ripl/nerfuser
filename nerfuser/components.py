@@ -6,14 +6,14 @@ from torchtyping import TensorType
 
 
 def get_nerfacto_outputs(self, ray_bundle: RayBundle):
-    ray_samples = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)[0]
+    ray_samples = self.proposal_sampler(ray_bundle=ray_bundle, density_fns=self.density_fns)[0]
     field_outputs = self.field(ray_samples, compute_normals=self.config.predict_normals)
 
     weights = ray_samples.get_weights(field_outputs[FieldHeadNames.DENSITY])
     rgbs = field_outputs[FieldHeadNames.RGB]
-    rgb = self.renderer_rgb(rgb=rgbs, weights=weights)
-    depth = self.renderer_depth(weights=weights, ray_samples=ray_samples)
-    accumulation = self.renderer_accumulation(weights=weights)
+    rgb = self.renderer_rgb(rgbs, weights)
+    depth = self.renderer_depth(weights, ray_samples)
+    accumulation = self.renderer_accumulation(weights)
 
     weights = torch.cat((torch.zeros_like(weights[..., [0], :]), weights), dim=-2)
     rgbs = torch.cat((torch.zeros_like(rgbs[..., [0], :]), rgbs), dim=-2)
@@ -26,12 +26,12 @@ def get_nerfacto_outputs(self, ray_bundle: RayBundle):
         'accumulation': accumulation,  # (n_rays, 1)
         'depth': depth,  # (n_rays, 1)
         'deltas': deltas,  # (n_rays, n_samples, 1)
-        'direction': ray_samples.frustums.directions[:, 0]  # (n_rays, 3)
+        'direction': ray_samples.frustums.directions[..., 0, :]  # (n_rays, 3)
     }
     if self.config.predict_normals:
         outputs.update({
-            'normals': self.normals_shader(self.renderer_normals(normals=field_outputs[FieldHeadNames.NORMALS], weights=weights)),  # computed normals from density gradients
-            'pred_normals': self.normals_shader(self.renderer_normals(field_outputs[FieldHeadNames.PRED_NORMALS], weights=weights))  # predicted normals from MLP
+            'normals': self.normals_shader(self.renderer_normals(field_outputs[FieldHeadNames.NORMALS], weights)),  # computed normals from density gradients
+            'pred_normals': self.normals_shader(self.renderer_normals(field_outputs[FieldHeadNames.PRED_NORMALS], weights))  # predicted normals from MLP
         })
     return outputs
 

@@ -46,7 +46,7 @@ conda create -n nerfuser -y python=3.9 && conda activate nerfuser
     git clone --recursive git@github.com:cvg/Hierarchical-Localization.git && pip install -e Hierarchical-Localization
     ```
 
-* [imageio-ffmpeg](https://pypi.org/project/imageio-ffmpeg/)
+* [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
 
     ```bash
     pip install imageio-ffmpeg
@@ -113,7 +113,7 @@ Registration results are saved in `outputs/registration` by default. Please run 
 
 ## NeRF Blending
 
-Run the following command to query the NeRFs with test poses as in `test.MOV` and generate the blending results:
+Run the following command to query the NeRFs with test poses as in `test` and generate the blending results:
 
 ```bash
 python -m nerfuser.blending \

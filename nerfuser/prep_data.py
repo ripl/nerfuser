@@ -48,7 +48,7 @@ def main(
         demo: if True, will not downsample the test split
         flip: if True, will flip the images
         sfm_tool: the SfM tool to use
-        joint_sfm: if True, will run SfM jointly for all extracted images
+        joint_sfm: if True, will run SfM jointly for all extracted images; necessary for getting the ground-truth poses in a common world coordinate system to enable evaluation
         extract_images: if True, will extract images from videos
         run_sfm: if True, will run SfM
         write_json: if True, will write the SfM results to json

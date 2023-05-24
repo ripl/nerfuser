@@ -194,7 +194,9 @@ class Registration:
             for model_name in self.model_names:
                 n = len(poses_sfm[model_name])
                 print(f'Got {n} poses for {model_name} from SfM.')
+                T_sfm_norm_path = output_dir / f'T~{cfg}~{model_name}_norm.npy'
                 if n < 2:
+                    T_sfm_norm_path.unlink(missing_ok=True)
                     continue
                 poses_norm = np.load(output_dir / f'poses~{model_name}_norm.npy')
                 s_lst = []
@@ -208,7 +210,7 @@ class Registration:
                 s = np.median(s_lst)
                 T = avg_trans([poses_norm[id] @ np.diag((s, s, s, 1)).astype(np.float32) @ np.linalg.inv(pose_sfm) for id, pose_sfm in poses_sfm[model_name]], s=s, avg_func=np.median)
                 Ts_sfm_norm[model_name] = T
-                np.save(output_dir / f'T~{cfg}~{model_name}_norm.npy', T)
+                np.save(T_sfm_norm_path, T)
             if not Ts_sfm_norm:
                 print(f'failed to recover any transform')
                 exit()
@@ -248,13 +250,17 @@ class Registration:
             colors = cycle(plt.cm.tab20.colors if self.model_gt_trans else plt.cm.tab10.colors)
             vis = Visualizer(show_frame=True)
             vis.add_trajectory([T_sfm_world @ Ts_norm_sfm[model_name] for model_name in Ts_norm_sfm], pose_spec=0, cam_size=0.3, color=next(colors))
+            color = next(colors)
             if self.model_gt_trans:
-                vis.add_trajectory(Ts_gt_norm_world, pose_spec=0, cam_size=0.28, color=next(colors))
+                vis.add_trajectory(Ts_gt_norm_world, pose_spec=0, cam_size=0.28, color=color)
             for i, model_name in enumerate(self.model_names):
-                vis.add_trajectory(T_sfm_world @ np.array([pose_sfm[1] for pose_sfm in poses_sfm[model_name]]) @ S_world_sfm, cam_size=0.3, color=next(colors))
+                color = next(colors)
+                if len(poses_sfm[model_name]):
+                    vis.add_trajectory(T_sfm_world @ np.array([pose_sfm[1] for pose_sfm in poses_sfm[model_name]]) @ S_world_sfm, cam_size=0.3, color=color)
+                color = next(colors)
                 if self.model_gt_trans:
                     poses_norm = np.load(output_dir / f'poses~{model_name}_norm.npy')
-                    vis.add_trajectory(Ts_gt_norm_world[i] @ poses_norm @ Ss_gt_world_norm[i], cam_size=0.28, color=next(colors))
+                    vis.add_trajectory(Ts_gt_norm_world[i] @ poses_norm @ Ss_gt_world_norm[i], cam_size=0.28, color=color)
             vis.show()
 
 
