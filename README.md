@@ -1,6 +1,6 @@
 # NeRFuser
 
-Official code release for NeRFuser.
+Official code release for NeRFuser [[paper](https://arxiv.org/abs/2305.13307)].
 
 <image src="assets/teaser.svg">
 
@@ -150,3 +150,17 @@ python -m nerfuser.fuser \
 ```
 
 Please run `python -m nerfuser.fuser -h` for more details.
+    
+## Citing NeRFuser
+
+If you find our work useful in your research, please consider citing the paper as follows:
+
+``` bibtex
+@article{fang23,
+    Author  = {Jiading Fang and Shengjie Lin and Igor Vasiljevic and Vitor Guizilini and Rares Ambrus and Adrien Gaidon and Gregory Shakhnarovich and Matthew R. Walter},
+    Title   = {{NeRFuser}: {L}arge-Scale Scene Representation by {NeRF} Fusion},
+    Journal = {arXiv:2305.13307},
+    Year    = {2023},
+    Arxiv   = {2305.13307}
+}
+```
