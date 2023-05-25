@@ -1,6 +1,6 @@
 # NeRFuser
 
-Official code release for NeRFuser [[paper](https://arxiv.org/abs/2305.13307)].
+Official code release for "NeRFuser: Large-Scale Scene Representation by NeRF Fusion" [[paper](https://arxiv.org/abs/2305.13307)].
 
 <image src="assets/teaser.svg">
 
