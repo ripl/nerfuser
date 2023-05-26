@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import cycle
 from pathlib import Path
+from time import time
 from typing import Literal, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -68,8 +69,13 @@ class Registration:
     """whether to compute transforms"""
     vis: bool = False
     """whether to visualize the registration"""
+    profiling: bool = False
+    """whether to enable profiling"""
 
     def main(self):
+        if self.profiling:
+            ts = [time()]
+
         if not self.name:
             self.name = datetime.now().strftime('%m.%d_%H:%M:%S')
         output_dir = self.output_dir / self.name
@@ -138,6 +144,8 @@ class Registration:
         rng = np.random.default_rng(0)
 
         if self.render_views:
+            if self.profiling:
+                ts.append(time())
             if isinstance(self.cam_info, Path):
                 with self.cam_info.open() as f:
                     transforms = json.load(f)
@@ -158,8 +166,12 @@ class Registration:
                 with torch.no_grad():
                     ViewRenderer(self.model_method, self.model_names[i], self.model_dirs[i], load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
                 np.save(output_dir / f'poses~{self.model_names[i]}_norm.npy', poses_norm)
+            if self.profiling:
+                print(f'Rendering views takes {time() - ts.pop():.3g}s.')
 
         if self.run_sfm:
+            if self.profiling:
+                ts.append(time())
             shutil.rmtree(sfm_dir, ignore_errors=True)
             sfm_dir.mkdir(parents=True)
             # uses hemi views, maybe training views
@@ -177,6 +189,8 @@ class Registration:
                         (sfm_dir / f'{model_name}_{f.name}').symlink_to(f.absolute())
             run_func = run_hloc if self.sfm_tool == 'hloc' else run_colmap
             run_func(sfm_dir, sfm_dir, CameraModel.OPENCV)
+            if self.profiling:
+                print(f'Running SfM takes {time() - ts.pop():.3g}s.')
 
         if self.compute_trans or self.vis:
             images = read_images_binary(sfm_dir / 'sparse/0/images.bin')
@@ -189,6 +203,8 @@ class Registration:
                 poses_sfm[model_name].append((id, extract_colmap_pose(im_data)))
 
         if self.compute_trans:
+            if self.profiling:
+                ts.append(time())
             # sfm-to-nerf_norm transforms
             Ts_sfm_norm = {}
             for model_name in self.model_names:
@@ -236,6 +252,11 @@ class Registration:
                     print(f'rotation error {r:.3g}')
                     print(f'translation error {t:.3g}')
                     print(f'scale error {s:.3g}')
+            if self.profiling:
+                print(f'Computing transforms takes {time() - ts.pop():.3g}s.')
+
+        if self.profiling:
+            print(f'In total it takes {time() - ts.pop():.3g}s.')
 
         if self.vis:
             T_world_sfm = np.load(output_dir / f'T~{cfg}.npy') if self.model_gt_trans else np.identity(4, dtype=np.float32)

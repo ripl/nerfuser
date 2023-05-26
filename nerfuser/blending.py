@@ -3,6 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from time import time
 from typing import Literal, Optional, Union
 
 import cv2
@@ -70,8 +71,13 @@ class Blending:
     """whether to blend views"""
     evaluate: bool = False
     """whether to evaluate the blending results"""
+    profiling: bool = False
+    """whether to enable profiling"""
 
     def main(self):
+        if self.profiling:
+            ts = [time()]
+
         if not self.name:
             self.name = datetime.now().strftime('%m.%d_%H:%M:%S')
         output_dir = self.output_dir / self.name / self.trans_src
@@ -125,6 +131,8 @@ class Blending:
                     blend_methods[f'{blend_method}_g{g:.2g}'] = (blend_method, g)
 
         if self.blend_views:
+            if self.profiling:
+                ts.append(time())
             Ts = []
             if self.trans_src == 'gt':
                 assert self.test_frame == 'world', 'test poses must be specified in world coordinates to utilize ground-truth world-to-nerf transforms'
@@ -172,6 +180,8 @@ class Blending:
                 poses = ch_pose_spec(np.array(gen_hemispheric_poses(d * 0.8 if d else 1, np.pi / 10, gamma_hi=np.pi / 10, m=1, n=60)), 0, 1, pose_type='w2c')
             with torch.no_grad():
                 ViewBlender(self.model_method, self.model_names, self.model_dirs, Ts, self.tau, load_step=self.step, use_global_metric=self.use_global_metric, chunk_size=self.chunk_size, device=self.device).blend_views(poses, cam_info, output_dir, blend_methods, multi_cam=multi_cam, save_extras=self.save_extras, animate=self.fps)
+            if self.profiling:
+                print(f'Blending views takes {time() - ts.pop():.3g}s.')
 
         if self.evaluate:
             assert self.test_poses, 'must provide test_poses json to evaluate'
@@ -203,6 +213,9 @@ class Blending:
                     print(f'{metric} {method}: {np.mean(results[method][metric]):.3f}')
             with (output_dir / 'eval.json').open(mode='w') as f:
                 json.dump(results, f, indent=2)
+
+        if self.profiling:
+            print(f'In total it takes {time() - ts.pop():.3g}s.')
 
 
 if __name__ == '__main__':
