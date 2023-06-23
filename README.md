@@ -27,7 +27,7 @@ Official code release for "NeRFuser: Large-Scale Scene Representation by NeRF Fu
 ### 0. Create a conda environment and activate it
 
 ```bash
-conda create -n nerfuser -y python=3.9 && conda activate nerfuser
+conda create -n nerfuser -y python=3.10 && conda activate nerfuser
 ```
 
 ### 1. Install dependencies
@@ -35,7 +35,7 @@ conda create -n nerfuser -y python=3.9 && conda activate nerfuser
 * [nerfstudio](https://github.com/nerfstudio-project/nerfstudio)
 
     ```bash
-    pip install torch==1.13.1 torchvision functorch
+    pip install torch torchvision
     pip install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
     pip install nerfstudio
     ```
