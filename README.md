@@ -91,7 +91,7 @@ for VID in $A $B $C; do
 done
 ```
 
-Please run `ns-train nerfacto -h` for more details. Trained NeRF models on the [sample dataset](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main) are provided [here](https://huggingface.co/RIPL/TTIC-common/tree/main).
+Please run `ns-train nerfacto -h` for more details. Trained NeRF models on the [sample dataset](https://huggingface.co/datasets/RIPL/TTIC-common/tree/main) are provided [here](https://huggingface.co/RIPL/TTIC-common/tree/main). *Note that the provided model ckpts are trained with `nerfstudio 0.3.2`. If you encounter issues loading them, consider either installing the exact matching version of `nerfstudio`, or training your own as above.*
 
 ## NeRF Registration
 
