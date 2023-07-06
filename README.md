@@ -43,13 +43,14 @@ conda create -n nerfuser -y python=3.10 && conda activate nerfuser
 * [hloc](https://github.com/cvg/Hierarchical-Localization)
 
     ```bash
-    git clone --recursive git@github.com:cvg/Hierarchical-Localization.git && pip install -e Hierarchical-Localization
+    git clone --recurse-submodules git@github.com:cvg/Hierarchical-Localization.git && pip install -e Hierarchical-Localization
     ```
 
-* [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
+* Misc
 
     ```bash
-    pip install imageio-ffmpeg
+    # due to a bug in open3d 0.17.0, we use the previous version
+    pip install imageio-ffmpeg open3d==0.16.0
     ```
 
 ### 2. Install NeRFuser
@@ -150,7 +151,7 @@ python -m nerfuser.fuser \
 ```
 
 Please run `python -m nerfuser.fuser -h` for more details.
-    
+
 ## Citing NeRFuser
 
 If you find our work useful in your research, please consider citing the paper as follows:

@@ -1,11 +1,12 @@
 [project]
 name = "nerfuser"
-version = "0.1.0"
+version = "0.1.1"
 
 dependencies=[
     "hloc",
     "imageio-ffmpeg",
     "nerfstudio",
+    "open3d==0.16.0",
 ]
 
 [tool.setuptools.packages.find]

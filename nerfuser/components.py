@@ -1,8 +1,9 @@
 import torch
+from jaxtyping import Float
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.model_components.renderers import RGBRenderer
-from torchtyping import TensorType
+from torch import Tensor
 
 
 def get_nerfacto_outputs(self, ray_bundle: RayBundle):
@@ -41,10 +42,10 @@ class WeightedRGBRenderer(RGBRenderer):
 
     def forward(
         self,
-        rgb: TensorType['bs': ..., 'n_samples', 3],
-        ws: TensorType['bs': ..., 'n_samples', 1],
-        bg_w: TensorType['bs': ..., 1],
-    ) -> TensorType['bs': ..., 3]:
+        rgb: Float[Tensor, '*bs n_samples 3'],
+        ws: Float[Tensor, '*bs n_samples 1'],
+        bg_w: Float[Tensor, '*bs 1'],
+    ) -> Float[Tensor, '*bs 3']:
         """Composite samples along ray and render color image
 
         Args:
