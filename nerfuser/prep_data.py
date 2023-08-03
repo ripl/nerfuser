@@ -62,16 +62,22 @@ def main(
         vid_exts = {'.' + re.fullmatch(r'\.?(.*)', vid_ext)[1].lower() for vid_ext in vid_exts}
     assert sum((fps is None, downsample is None, n_frames is None)) >= 2, 'at most one of fps, downsample and n-frames should be specified'
 
-    vids = defaultdict(set)
-    for vid_id in vid_ids:
-        for f in dataset_dir.iterdir():
-            if not f.stem.startswith(vid_id) or vid_exts and f.suffix.lower() not in vid_exts:
-                continue
-            try:
-                assert 'nframes' in imageio.get_reader(f).get_meta_data()
-            except Exception:
-                continue
-            vids[vid_id].add(f)
+    if extract_images:
+        vids = defaultdict(set)
+        for vid_id in vid_ids:
+            for f in dataset_dir.iterdir():
+                if not f.stem.startswith(vid_id) or vid_exts and f.suffix.lower() not in vid_exts:
+                    continue
+                try:
+                    assert 'nframes' in imageio.get_reader(f).get_meta_data()
+                except Exception:
+                    continue
+                vids[vid_id].add(f)
+    else:
+        vids = set()
+        for vid_id in vid_ids:
+            if (output_dir / vid_id).exists():
+                vids.add(vid_id)
     sfm_dir = output_dir / sfm_tool
 
     if extract_images:
