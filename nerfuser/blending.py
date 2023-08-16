@@ -80,7 +80,7 @@ class Blending:
 
         if not self.name:
             self.name = datetime.now().strftime('%m.%d_%H:%M:%S')
-        output_dir = self.output_dir / self.name / self.trans_src
+        output_dir = self.output_dir / self.name / self.trans_src + (f'_t{self.tau:.2g}' if self.tau else '')
         output_dir.mkdir(parents=True, exist_ok=True)
         n_models = len(self.model_dirs)
         if not self.model_names:

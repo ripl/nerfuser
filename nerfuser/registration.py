@@ -51,6 +51,12 @@ class Registration:
     """use 1.3x hemispheric poses for rendering"""
     chunk_size: Optional[int] = None
     """number of rays to process at a time"""
+    filter_poses_acc_dist: Optional[float] = None
+    """starting distance of accumulation for filtering pose samples"""
+    filter_poses_acc_th: Optional[float] = None
+    """threshold of distant accumulation for filtering poses samples; only applicable when filter-poses-acc-dist is present"""
+    save_extras: bool = False
+    """whether to save extra outputs (distant accumulation maps)"""
     fps: Optional[int] = None
     """if present, will use this frame rate for video output"""
     sfm_tool: Literal['hloc', 'colmap'] = 'hloc'
@@ -75,6 +81,7 @@ class Registration:
     def main(self):
         if self.profiling:
             ts = [time()]
+            profiling_dict = {}
 
         if not self.name:
             self.name = datetime.now().strftime('%m.%d_%H:%M:%S')
@@ -89,9 +96,11 @@ class Registration:
                 cfg += f'_train{int(self.sfm_w_training_views)}'
         else:
             cfg = 'train' if self.training_poses else 'hemi'
+        if None not in {self.filter_poses_acc_dist, self.filter_poses_acc_th}:
+            cfg += f'_acc-th{self.filter_poses_acc_th:.2f}'
         sfm_dir = output_dir / f'{self.sfm_tool}~{cfg}'
         log_dict = {}
-        for attr in ('model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'sfm_tool'):
+        for attr in ('model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'filter_poses_acc_dist', 'filter_poses_acc_th', 'sfm_tool'):
             val = getattr(self, attr)
             if attr in {'model_dirs', 'training_poses'}:
                 if val:
@@ -164,10 +173,12 @@ class Registration:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
                     poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.array([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
                 with torch.no_grad():
-                    ViewRenderer(self.model_method, self.model_names[i], self.model_dirs[i], load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, animate=self.fps)
+                    ViewRenderer(self.model_method, self.model_names[i], self.model_dirs[i], load_step=self.step, chunk_size=self.chunk_size, device=self.device).render_views(poses_norm, cam_info, output_dir, filter_poses_acc_dist=self.filter_poses_acc_dist, save_extras=self.save_extras, animate=self.fps)
                 np.save(output_dir / f'poses~{self.model_names[i]}_norm.npy', poses_norm)
             if self.profiling:
-                print(f'Rendering views takes {time() - ts.pop():.3g}s.')
+                elapsed_time = time() - ts.pop()
+                print(f'Rendering views takes {elapsed_time:.3g}s.')
+                profiling_dict['rendering_views'] = elapsed_time
 
         if self.run_sfm:
             if self.profiling:
@@ -181,16 +192,20 @@ class Registration:
             # uses training views only
             c3 = self.training_poses and not self.render_hemi_views
             for i, model_name in enumerate(self.model_names):
+                if self.filter_poses_acc_dist is not None:
+                    dist_accs = np.load(output_dir / model_name / f'dist_accs_{self.filter_poses_acc_dist:.2f}.npy')
                 if c1:
                     ids = set(rng.permutation(ks[i])[:np.floor(ls[i] * self.sfm_w_hemi_views).astype(int)])
-                for f in (output_dir / model_name).iterdir():
+                for f in (output_dir / model_name / 'imgs').iterdir():
                     id = int(f.stem)
-                    if c1 and id in ids or c2 and id >= ks[i] or c3:
+                    if c1 and id in ids and (self.filter_poses_acc_dist is None or dist_accs[id] >= self.filter_poses_acc_th) or c2 and id >= ks[i] or c3:
                         (sfm_dir / f'{model_name}_{f.name}').symlink_to(f.absolute())
             run_func = run_hloc if self.sfm_tool == 'hloc' else run_colmap
             run_func(sfm_dir, sfm_dir, CameraModel.OPENCV)
             if self.profiling:
-                print(f'Running SfM takes {time() - ts.pop():.3g}s.')
+                elapsed_time = time() - ts.pop()
+                print(f'Running SfM takes {elapsed_time:.3g}s.')
+                profiling_dict['running_sfm'] = elapsed_time
 
         if self.compute_trans or self.vis:
             images = read_images_binary(sfm_dir / 'sparse/0/images.bin')
@@ -248,15 +263,23 @@ class Registration:
                 if self.model_gt_trans:
                     T_gt = Ts_gt_norm_world[i]
                     print('gt transform\n', T_gt)
-                    r, t, s = compute_trans_diff(T_gt, T_pred)
+                    r, t, s = compute_trans_diff(T_pred, T_gt)
                     print(f'rotation error {r:.3g}')
                     print(f'translation error {t:.3g}')
                     print(f'scale error {s:.3g}')
+                    np.savez(output_dir / f'eval~{cfg}~{model_name}_norm.npz', r=r, t=t, s=s, n_sfm_input_poses=len([p for p in sfm_dir.iterdir() if p.suffix == '.png']), n_sfm_recovered_poses=sum(len(poses_sfm[model_name]) for model_name in self.model_names))
             if self.profiling:
-                print(f'Computing transforms takes {time() - ts.pop():.3g}s.')
+                elapsed_time = time() - ts.pop()
+                print(f'Computing transforms takes {elapsed_time:.3g}s.')
+                profiling_dict['computing_trans'] = elapsed_time
 
         if self.profiling:
-            print(f'In total it takes {time() - ts.pop():.3g}s.')
+            elapsed_time = time() - ts.pop()
+            print(f'In total it takes {elapsed_time:.3g}s.')
+            profiling_dict['total'] = elapsed_time
+            profiling_dict_ = np.load(output_dir / f'profiling~{cfg}.npz') if (output_dir / f'profiling~{cfg}.npz').exists() else {}
+            profiling_dict_.update(profiling_dict)
+            np.savez(output_dir / f'profiling~{cfg}.npz', **profiling_dict_)
 
         if self.vis:
             T_world_sfm = np.load(output_dir / f'T~{cfg}.npy') if self.model_gt_trans else np.identity(4, dtype=np.float32)
