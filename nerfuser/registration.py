@@ -47,6 +47,10 @@ class Registration:
     """paths to json containing training poses; if present, will be used to render training views and to determine the number of hemispheric poses"""
     n_hemi_poses: int = 30
     """number of hemispheric poses; only applicable when training-poses is not present"""
+    hemi_gamma_lo: float = 0
+    """lower bound of elevation angle for hemispheric pose sampling"""
+    hemi_gamma_hi: float = np.pi / 6
+    """upper bound of elevation angle for hemispheric pose sampling"""
     render_hemi_views: bool = False
     """use 1.3x hemispheric poses for rendering"""
     chunk_size: Optional[int] = None
@@ -96,11 +100,13 @@ class Registration:
                 cfg += f'_train{int(self.sfm_w_training_views)}'
         else:
             cfg = 'train' if self.training_poses else 'hemi'
-        if None not in {self.filter_poses_acc_dist, self.filter_poses_acc_th}:
-            cfg += f'_acc-th{self.filter_poses_acc_th:.2f}'
+        if self.filter_poses_acc_dist is not None:
+            cfg += f'_acc-dist{self.filter_poses_acc_dist:.2f}'
+            if self.filter_poses_acc_th is not None:
+                cfg += f'_acc-th{self.filter_poses_acc_th:.4f}'
         sfm_dir = output_dir / f'{self.sfm_tool}~{cfg}'
         log_dict = {}
-        for attr in ('model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'filter_poses_acc_dist', 'filter_poses_acc_th', 'sfm_tool'):
+        for attr in ('model_dirs', 'model_method', 'model_gt_trans', 'step', 'cam_info', 'downscale_factor', 'training_poses', 'n_hemi_poses', 'hemi_gamma_lo', 'hemi_gamma_hi', 'filter_poses_acc_dist', 'filter_poses_acc_th', 'sfm_tool'):
             val = getattr(self, attr)
             if attr in {'model_dirs', 'training_poses'}:
                 if val:
@@ -147,9 +153,10 @@ class Registration:
         else:
             ls = np.full(n_models, self.n_hemi_poses)
             ks = np.floor(ls * 1.3).astype(int) if self.render_hemi_views else ls
-        m = (1 + np.sqrt(1 + ks / 3)) / 2
+        hemi_gamma_delta = self.hemi_gamma_hi - self.hemi_gamma_lo
+        m = (1 + np.sqrt(1 + 2 * hemi_gamma_delta * ks / np.pi)) / 2
         ms = np.ceil(m).astype(int)
-        ns = np.ceil(12 * (m - 1)).astype(int)
+        ns = np.ceil(2 * np.pi * (m - 1) / hemi_gamma_delta).astype(int)
         rng = np.random.default_rng(0)
 
         if self.render_views:
@@ -168,7 +175,7 @@ class Registration:
             cam_info['height'] = int(cam_info['height'])
             cam_info['width'] = int(cam_info['width'])
             for i in range(n_models):
-                poses_norm = complete_trans(np.array(gen_hemispheric_poses(1, np.pi / 6, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
+                poses_norm = complete_trans(np.array(gen_hemispheric_poses(1, self.hemi_gamma_lo, gamma_hi=self.hemi_gamma_hi, m=ms[i], n=ns[i])))[np.sort(rng.permutation(ms[i] * ns[i])[:ks[i]])] if not self.training_poses or self.render_hemi_views else np.empty((0, 4, 4), dtype=np.float32)
                 if self.training_poses:
                     pose_dict = {frame['file_path']: np.array(frame['transform_matrix'], dtype=np.float32) for frame in frames[i]}
                     poses_norm = np.concatenate((poses_norm, Ts_nerf_norm[i] @ np.array([pose_dict[k] for k in sorted(pose_dict.keys())]) @ Ss_norm_nerf[i]))
@@ -267,7 +274,7 @@ class Registration:
                     print(f'rotation error {r:.3g}')
                     print(f'translation error {t:.3g}')
                     print(f'scale error {s:.3g}')
-                    np.savez(output_dir / f'eval~{cfg}~{model_name}_norm.npz', r=r, t=t, s=s, n_sfm_input_poses=len([p for p in sfm_dir.iterdir() if p.suffix == '.png']), n_sfm_recovered_poses=sum(len(poses_sfm[model_name]) for model_name in self.model_names))
+                    np.savez(output_dir / f'eval~{cfg}~{model_name}_norm.npz', r=r, t=t, s=s, n_sfm_input_imgs=len([p for p in sfm_dir.iterdir() if re.fullmatch(fr'{model_name}_\d+.png', p.name)]), n_sfm_recovered_poses=sum(len(poses_sfm[model_name]) for model_name in self.model_names))
             if self.profiling:
                 elapsed_time = time() - ts.pop()
                 print(f'Computing transforms takes {elapsed_time:.3g}s.')
@@ -278,8 +285,10 @@ class Registration:
             print(f'In total it takes {elapsed_time:.3g}s.')
             profiling_dict['total'] = elapsed_time
             profiling_dict_ = np.load(output_dir / f'profiling~{cfg}.npz') if (output_dir / f'profiling~{cfg}.npz').exists() else {}
-            profiling_dict_.update(profiling_dict)
-            np.savez(output_dir / f'profiling~{cfg}.npz', **profiling_dict_)
+            for k in profiling_dict_:
+                if k not in profiling_dict:
+                    profiling_dict[k] = profiling_dict_[k]
+            np.savez(output_dir / f'profiling~{cfg}.npz', **profiling_dict)
 
         if self.vis:
             T_world_sfm = np.load(output_dir / f'T~{cfg}.npy') if self.model_gt_trans else np.identity(4, dtype=np.float32)
