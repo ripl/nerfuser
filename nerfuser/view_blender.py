@@ -29,7 +29,7 @@ class ViewBlender:
                 # load the latest checkpoint
                 load_path = max(load_dir.iterdir())
                 load_step = int(load_path.stem[5:])
-            state = torch.load(load_path, map_location=device)
+            state = torch.load(load_path, map_location=device, weights_only=True)
             state = {key[7:]: val for key, val in state['pipeline'].items() if key.startswith('_model.')}
             if model_method == 'nerfacto':
                 model = NerfactoModelConfig().setup(scene_box=SceneBox(aabb=state['field.aabb']), num_train_data=len(state['field.embedding_appearance.embedding.weight'])).to(device)
